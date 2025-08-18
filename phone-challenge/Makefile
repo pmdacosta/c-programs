@@ -3,6 +3,10 @@ phonesort: phonefind.c
 
 run:
 	./phonefind contacts.csv john
+	./phonefind contacts.csv ja
+	./phonefind contacts.csv 485
+	./phonefind contacts.csv Garcia
+	./phonefind contacts.csv xyz
 
 clean:
 	rm -f phonesort

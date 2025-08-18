@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,6 +67,28 @@ struct Contact *read_contacts(const char *filename, int *out_count) {
     return contacts;
 }
 
+// returns 1 if matches, 0 otherwise
+int check_matches(const char *search_term, struct Contact contact) { 
+    if(strcasestr(contact.name, search_term)) return 1;
+    if(strcasestr(contact.phone, search_term)) return 1;
+    return 0;
+}
+
+struct Contact *find_contacts(struct Contact *contacts, int contacts_size,
+                              const char *search_term, int *out_count) {
+    int count = 0;
+    struct Contact *matches = malloc(contacts_size * sizeof(struct Contact));
+
+    for (int i = 0; i < contacts_size; i++) {
+        if(check_matches(search_term, contacts[i])) {
+            matches[count] = contacts[i];
+            count++;
+        }
+    }
+    *out_count = count;
+    return matches;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 3) {
         puts("Usage: phonefind <csv-file> <search-term>");
@@ -83,9 +106,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    for (int i = 0; i < count; i++) {
+    int match_count = 0;
+    struct Contact *matches =
+        find_contacts(contacts, count, search_term, &match_count);
+    
+    if(!match_count) {
+        puts("No contacts found");
+        return 0;
+    }
+
+    for (int i = 0; i < match_count; i++) {
         printf("id: %d | name: %s | phone: %s\n", contacts[i].id,
-               contacts[i].name, contacts[i].phone);
+               matches[i].name, matches[i].phone);
     }
 
     return 0;
