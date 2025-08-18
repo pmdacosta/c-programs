@@ -1,0 +1,10 @@
+# Vim swap/backup
+*.swp
+*.swo
+*~
+
+# Compiled program
+phonesort
+
+# Object files
+*.o
