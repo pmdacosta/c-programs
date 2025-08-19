@@ -10,8 +10,8 @@
 #define SEARCH_PHONE 1
 #define SEARCH_NAME 2
 
-int CASE = 0;
-int SEARCH = SEARCH_ANY;
+int g_case = 0;
+int g_search = SEARCH_ANY;
 
 struct Contact {
     int id;
@@ -74,42 +74,30 @@ struct Contact *read_contacts(const char *filename, int *out_count) {
     return contacts;
 }
 
-int check_matches_name(const char *search_term, struct Contact contact) {
-    if (CASE) {
-        if (strstr(contact.name, search_term))
-            return 1;
-    } else {
-        if (strcasestr(contact.name, search_term))
-            return 1;
-    }
-    return 0;
+int contains(const char *haystack, const char *needle) {
+    return g_case ? (strstr(haystack, needle) != NULL)
+        : (strcasestr(haystack, needle) != NULL);
 }
 
-int check_matches_phone(const char *search_term, struct Contact contact) {
-    if (strcasestr(contact.phone, search_term)) return 1;
-    return 0;
+
+int check_matches_name(const char *search_term, struct Contact *contact) {
+    return contains(contact->name, search_term);
 }
 
-int check_matches_any(const char *search_term, struct Contact contact) {
-    if (CASE) {
-        if (strstr(contact.name, search_term))
-            return 1;
-        if (strstr(contact.phone, search_term))
-            return 1;
-    } else {
-        if (strcasestr(contact.name, search_term))
-            return 1;
-        if (strcasestr(contact.phone, search_term))
-            return 1;
-    }
-    return 0;
+int check_matches_phone(const char *search_term, struct Contact *contact) {
+    return contains(contact->phone, search_term);
+}
+
+int check_matches_any(const char *search_term, struct Contact *contact) {
+    if(contains(contact->name, search_term)) return 1;
+    return contains(contact->phone, search_term);
 }
 
 // returns 1 if matches, 0 otherwise
-int check_matches(const char *search_term, struct Contact contact) {
-    if (SEARCH == SEARCH_NAME) {
+int check_matches(const char *search_term, struct Contact *contact) {
+    if (g_search == SEARCH_NAME) {
         return check_matches_name(search_term, contact);
-    } else if (SEARCH == SEARCH_PHONE) {
+    } else if (g_search == SEARCH_PHONE) {
         return check_matches_phone(search_term, contact); 
     } else {
         return check_matches_any(search_term, contact);
@@ -121,9 +109,14 @@ struct Contact *find_contacts(struct Contact *contacts, int contacts_size,
                               const char *search_term, int *out_count) {
     int count = 0;
     struct Contact *matches = malloc(contacts_size * sizeof(struct Contact));
+    if(!matches) {
+        puts("Error allocating memory in find_contacts");
+        *out_count = 0;
+        return NULL;
+    }
 
     for (int i = 0; i < contacts_size; i++) {
-        if (check_matches(search_term, contacts[i])) {
+        if (check_matches(search_term, &contacts[i])) {
             matches[count] = contacts[i];
             count++;
         }
@@ -132,22 +125,27 @@ struct Contact *find_contacts(struct Contact *contacts, int contacts_size,
     return matches;
 }
 
+void print_usage(void) {
+    puts("Usage: phonefind <csv-file> <search-term> [--case] [--search=name|phone]");
+}
+
+
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        puts("Usage: phonefind <csv-file> <search-term> --case --search=name|phone");
+        print_usage();
         return 1;
     }
 
     if (argc > 3) {
         for(int i = 3; i < argc; i++) {
             if (strcmp(argv[i], "--case") == 0) {
-                CASE = 1;
+                g_case = 1;
             } else if (strcmp(argv[i], "--search=name") == 0) {
-                SEARCH = SEARCH_NAME;
+                g_search = SEARCH_NAME;
             } else if (strcmp(argv[i], "--search=phone") == 0) {
-                SEARCH = SEARCH_PHONE;
+                g_search = SEARCH_PHONE;
             } else {
-                puts("Usage: phonefind <csv-file> <search-term> --case --search=name|phone");
+                print_usage();
                 return 1;
             }
         }
@@ -170,13 +168,17 @@ int main(int argc, char *argv[]) {
 
     if (!match_count) {
         puts("No contacts found");
+        free(contacts);
+        free(matches);
         return 0;
     }
 
     for (int i = 0; i < match_count; i++) {
-        printf("id: %d | name: %s | phone: %s\n", contacts[i].id,
+        printf("id: %d | name: %s | phone: %s\n", matches[i].id,
                matches[i].name, matches[i].phone);
     }
 
+    free(contacts);
+    free(matches);
     return 0;
 }
