@@ -1,0 +1,10 @@
+# Vim swap/backup
+*.swp
+*.swo
+*~
+
+# Compiled program
+editor
+
+# Object files
+*.o
