@@ -1,3 +1,4 @@
+#include <asm-generic/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,18 +6,30 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
+#include <signal.h>
 
 #define PORT 8080
 #define BACKLOG 5
 #define BUF_SIZE 1024
 
-int main(int argc, char *argv[]) {
-    int sockfd;
-    int clientfd;
-    struct sockaddr_in serv_addr;
-    struct sockaddr_in client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
+void sigchld_handler(int signo) {
+    (void)signo; // suppress unused warning
+    while (waitpid (-1, NULL, WNOHANG) > 0); 
+}
+
+void echo_loop(int clientfd) {
     char buffer[BUF_SIZE];
+    ssize_t n;
+
+    while ((n = read(clientfd, buffer, BUF_SIZE)) > 0) {
+        write(clientfd, buffer, n);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int server_fd;
+    struct sockaddr_in addr;
     int port = PORT;
 
     if(argc == 2) {
@@ -24,60 +37,67 @@ int main(int argc, char *argv[]) {
     }
 
     // Create a TCP (SOCK_STREAM) socket in the IPv4 (AF_INET) domain
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd < 0) {
+    if((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
+    // Tell kernel we want to reuse port immediately
+    // Don't wait for TIME_WAIT
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     // Zero out the address structure
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;                 // IPv4
-    serv_addr.sin_addr.s_addr = INADDR_ANY;         // Listen on all interfaces
-    serv_addr.sin_port = htons(port);    // Port in network byte order (htons)
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;                 // IPv4
+    addr.sin_addr.s_addr = INADDR_ANY;         // Listen on all interfaces
+    addr.sin_port = htons(port);    // Port in network byte order (htons)
 
     // Bind the socket
-    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+    if (bind(server_fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
         perror("bind failed");
-        close(sockfd);
+        close(server_fd);
         exit(EXIT_FAILURE);
     }
 
-    if (listen(sockfd, BACKLOG) < 0) {
+    if (listen(server_fd, BACKLOG) == -1) {
         perror("listen failed");
-        close(sockfd);
+        close(server_fd);
         exit(EXIT_FAILURE);
     }
+
+    signal(SIGCHLD, sigchld_handler);
 
     printf("Server listening on port %d...\n", port);
 
-    clientfd = accept(sockfd, (struct sockaddr*) &client_addr, &client_addr_len);
-    if (clientfd < 0) {
-        perror("accept failed");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
-    printf("Client connected!\n");
 
-    // Echo loop
     while (1) {
-        ssize_t bytes_read = read(clientfd, buffer, BUF_SIZE - 1);
-        if (bytes_read <= 0) {
-            printf("Client disconnected\n");
-            break;
-        }
-        buffer[bytes_read] = '\0';
-        printf("Received %ld: %s", bytes_read, buffer);
+        struct sockaddr_in client_addr;
+        socklen_t addr_len = sizeof(client_addr);
+        int clientfd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
 
-        // echo back
-        if (write(clientfd, buffer, bytes_read) < 0) {
-            perror("write failed");
-            break;
+        if (clientfd == -1) {
+            perror("accept failed");
+            continue;
         }
-    }
 
-    close(clientfd);
-    close(sockfd);
+        char * client_ip = inet_ntoa(client_addr.sin_addr);
+        printf("New connection from %s\n", client_ip);
+
+        if (fork() == 0) {
+            // Child process
+            close(server_fd); // child doesn't need to accept more connections
+            echo_loop(clientfd);
+            close(clientfd);
+            printf("Client %s disconnected.\n", client_ip);
+            exit(0);
+        } else {
+            // Parent process
+            close(clientfd); // parent doesn't need the clientfd
+        }
+   }
+
+    close(server_fd);
 
     return 0;
 }
