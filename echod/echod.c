@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -12,6 +13,9 @@
 #define PORT 8080
 #define BACKLOG 5
 #define BUF_SIZE 1024
+#define TS_SIZE 64
+
+int server_fd = 1; // make global so SIGINT handler can close it
 
 // SIGCHLD handler to reap zombie processes
 void reap_children(int signo) {
@@ -19,6 +23,23 @@ void reap_children(int signo) {
     while (waitpid (-1, NULL, WNOHANG) > 0) {
         // Clean up all terminated children
     }; 
+}
+
+// SIGINT handler for graceful shutdown
+void handle_sigint(int signo) {
+    (void)signo; // suppress unused warning
+    if (server_fd != -1) {
+        printf("\nShutting down server...\n");
+        close(server_fd);
+    }
+    exit(EXIT_SUCCESS);
+}
+
+// returns current timestamp string
+void timestamp(char *buf, size_t len) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buf, len, "%Y-%m-%d %H:%M:%S", t);
 }
 
 void echo_loop(int clientfd) {
@@ -34,7 +55,6 @@ void echo_loop(int clientfd) {
 }
 
 int main(int argc, char *argv[]) {
-    int server_fd;
     int client_fd;
     struct sockaddr_in serv_addr;
     struct sockaddr_in client_addr;
@@ -79,8 +99,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // install handler for zombie cleanup
+    // install handlers
     signal(SIGCHLD, reap_children);
+    signal(SIGINT, handle_sigint);
 
     printf("Server listening on port %d...\n", port);
 
@@ -95,7 +116,9 @@ int main(int argc, char *argv[]) {
         }
 
         char * client_ip = inet_ntoa(client_addr.sin_addr);
-        printf("New connection from %s\n", client_ip);
+        char ts[TS_SIZE];
+        timestamp(ts, sizeof(ts));
+        printf("[%s] New connection from %s\n", ts, client_ip);
 
         pid_t pid = fork();
         if(pid < 0) {
@@ -109,7 +132,8 @@ int main(int argc, char *argv[]) {
             close(server_fd); // child doesn't need to accept more connections
             echo_loop(client_fd);
             close(client_fd);
-            printf("Client %s disconnected.\n", client_ip);
+            timestamp(ts, sizeof(ts));
+            printf("[%s] Client %s disconnected.\n", ts, client_ip);
             exit(EXIT_SUCCESS);
         } else {
             // Parent process
