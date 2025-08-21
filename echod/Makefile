@@ -4,5 +4,8 @@ echod: echod.c
 run:
 	./echod
 
+client:
+	nc localhost 8080
+
 clean:
 	rm -f echod
