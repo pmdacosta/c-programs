@@ -13,24 +13,34 @@
 #define BACKLOG 5
 #define BUF_SIZE 1024
 
-void sigchld_handler(int signo) {
+// SIGCHLD handler to reap zombie processes
+void reap_children(int signo) {
     (void)signo; // suppress unused warning
-    while (waitpid (-1, NULL, WNOHANG) > 0); 
+    while (waitpid (-1, NULL, WNOHANG) > 0) {
+        // Clean up all terminated children
+    }; 
 }
 
 void echo_loop(int clientfd) {
     char buffer[BUF_SIZE];
-    ssize_t n;
-
-    while ((n = read(clientfd, buffer, BUF_SIZE)) > 0) {
-        write(clientfd, buffer, n);
+    while(1) {
+        ssize_t bytes_read = read(clientfd, buffer, BUF_SIZE);
+        if( bytes_read < 0) {
+            break; // client closed or error
+        }
+        buffer[bytes_read] = '\0';
+        write(clientfd, buffer, bytes_read);
     }
 }
 
 int main(int argc, char *argv[]) {
     int server_fd;
-    struct sockaddr_in addr;
+    int client_fd;
+    struct sockaddr_in serv_addr;
+    struct sockaddr_in client_addr;
+    socklen_t client_len;
     int port = PORT;
+    int opt = 1;
 
     if(argc == 2) {
         port = atoi(argv[1]);
@@ -44,17 +54,20 @@ int main(int argc, char *argv[]) {
 
     // Tell kernel we want to reuse port immediately
     // Don't wait for TIME_WAIT
-    int opt = 1;
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
 
     // Zero out the address structure
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;                 // IPv4
-    addr.sin_addr.s_addr = INADDR_ANY;         // Listen on all interfaces
-    addr.sin_port = htons(port);    // Port in network byte order (htons)
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;                 // IPv4
+    serv_addr.sin_addr.s_addr = INADDR_ANY;         // Listen on all interfaces
+    serv_addr.sin_port = htons(port);    // Port in network byte order (htons)
 
     // Bind the socket
-    if (bind(server_fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    if (bind(server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         perror("bind failed");
         close(server_fd);
         exit(EXIT_FAILURE);
@@ -66,17 +79,17 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    signal(SIGCHLD, sigchld_handler);
+    // install handler for zombie cleanup
+    signal(SIGCHLD, reap_children);
 
     printf("Server listening on port %d...\n", port);
 
 
     while (1) {
-        struct sockaddr_in client_addr;
-        socklen_t addr_len = sizeof(client_addr);
-        int clientfd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+        client_len = sizeof(client_addr);
+        client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
 
-        if (clientfd == -1) {
+        if (client_fd == -1) {
             perror("accept failed");
             continue;
         }
@@ -84,16 +97,23 @@ int main(int argc, char *argv[]) {
         char * client_ip = inet_ntoa(client_addr.sin_addr);
         printf("New connection from %s\n", client_ip);
 
-        if (fork() == 0) {
+        pid_t pid = fork();
+        if(pid < 0) {
+            perror("fork failed");
+            close(client_fd);
+            continue;
+        }
+
+        if (pid == 0) {
             // Child process
             close(server_fd); // child doesn't need to accept more connections
-            echo_loop(clientfd);
-            close(clientfd);
+            echo_loop(client_fd);
+            close(client_fd);
             printf("Client %s disconnected.\n", client_ip);
-            exit(0);
+            exit(EXIT_SUCCESS);
         } else {
             // Parent process
-            close(clientfd); // parent doesn't need the clientfd
+            close(client_fd); // parent doesn't need the clientfd
         }
    }
 
