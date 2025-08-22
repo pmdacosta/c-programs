@@ -2,6 +2,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
@@ -14,16 +15,9 @@
 #define BACKLOG 5
 #define BUF_SIZE 1024
 #define TS_SIZE 64
+#define MAX_CLIENTS FD_SETSIZE // system-defined max (usually 1024)
 
 int server_fd = 1; // make global so SIGINT handler can close it
-
-// SIGCHLD handler to reap zombie processes
-void reap_children(int signo) {
-    (void)signo; // suppress unused warning
-    while (waitpid (-1, NULL, WNOHANG) > 0) {
-        // Clean up all terminated children
-    }; 
-}
 
 // SIGINT handler for graceful shutdown
 void handle_sigint(int signo) {
@@ -42,18 +36,6 @@ void timestamp(char *buf, size_t len) {
     strftime(buf, len, "%Y-%m-%d %H:%M:%S", t);
 }
 
-void echo_loop(int clientfd) {
-    char buffer[BUF_SIZE];
-    while(1) {
-        ssize_t bytes_read = read(clientfd, buffer, BUF_SIZE);
-        if( bytes_read < 0) {
-            break; // client closed or error
-        }
-        buffer[bytes_read] = '\0';
-        write(clientfd, buffer, bytes_read);
-    }
-}
-
 int main(int argc, char *argv[]) {
     int client_fd;
     struct sockaddr_in serv_addr;
@@ -61,6 +43,9 @@ int main(int argc, char *argv[]) {
     socklen_t client_len;
     int port = PORT;
     int opt = 1;
+    fd_set readfds;
+    int max_fd;
+    char ts[TS_SIZE];
 
     if(argc == 2) {
         port = atoi(argv[1]);
@@ -71,6 +56,7 @@ int main(int argc, char *argv[]) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
+    max_fd = server_fd;
 
     // Tell kernel we want to reuse port immediately
     // Don't wait for TIME_WAIT
@@ -100,46 +86,84 @@ int main(int argc, char *argv[]) {
     }
 
     // install handlers
-    signal(SIGCHLD, reap_children);
     signal(SIGINT, handle_sigint);
 
     printf("Server listening on port %d...\n", port);
 
+    // client tracking
+    int client_sockets[MAX_CLIENTS];
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        client_sockets[i] = -1;
+    }
 
     while (1) {
-        client_len = sizeof(client_addr);
-        client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+        FD_ZERO(&readfds);
+        FD_SET(server_fd, &readfds);
 
-        if (client_fd == -1) {
-            perror("accept failed");
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if(client_sockets[i] != -1) {
+                FD_SET(client_sockets[i], &readfds);
+                if (client_sockets[i] > max_fd) {
+                    max_fd = client_sockets[i];
+                }
+            }
+        }
+
+        int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
+
+        if (activity < 0) {
+            perror("select error");
             continue;
         }
 
-        char * client_ip = inet_ntoa(client_addr.sin_addr);
-        char ts[TS_SIZE];
-        timestamp(ts, sizeof(ts));
-        printf("[%s] New connection from %s\n", ts, client_ip);
+        // new connection
+        if (FD_ISSET(server_fd, &readfds)) {
+            client_len = sizeof(client_addr);
+            client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+            if (client_fd == -1) {
+                perror("accept failed");
+                continue;
+            }
+            
+            // add to list
+            int bool_added = 0; // boolean
+            for (int i = 0; i < MAX_CLIENTS; i++) {
+                if (client_sockets[i] == -1) {
+                    client_sockets[i] = client_fd;
+                    bool_added = 1;
+                    break;
+                }
+            }
 
-        pid_t pid = fork();
-        if(pid < 0) {
-            perror("fork failed");
-            close(client_fd);
-            continue;
+            if (!bool_added) {
+                printf("Too many clients, rejecting connection.\n");
+                close(client_fd);
+            } else {
+                char *client_ip = inet_ntoa(client_addr.sin_addr);
+                timestamp(ts, sizeof(ts));
+                printf("[%s] New connection from %s\n", ts, client_ip);
+            }
         }
 
-        if (pid == 0) {
-            // Child process
-            close(server_fd); // child doesn't need to accept more connections
-            echo_loop(client_fd);
-            close(client_fd);
-            timestamp(ts, sizeof(ts));
-            printf("[%s] Client %s disconnected.\n", ts, client_ip);
-            exit(EXIT_SUCCESS);
-        } else {
-            // Parent process
-            close(client_fd); // parent doesn't need the clientfd
+        // check all clients for data
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            int sock = client_sockets[i];
+            if (sock != 1 && FD_ISSET(sock, &readfds)) {
+                char buffer[BUF_SIZE];
+                ssize_t bytes_read = read(sock, buffer, BUF_SIZE);
+                if (bytes_read <= 0) {
+                    // client disconnected
+                    timestamp(ts, sizeof(ts));
+                    printf("[%s] Client on fd %d disconnected\n", ts, sock);
+                    close(sock);
+                    client_sockets[i] = -1;
+                } else {
+                    buffer[bytes_read] = '\0';
+                    write(sock, buffer, bytes_read);
+                }
+            }
         }
-   }
+    }
 
     close(server_fd);
 
