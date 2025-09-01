@@ -1,7 +1,9 @@
 #include <ncurses.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define MAX_HEALTH 20
+#define BUF_SIZE 256
 
 typedef struct Player {
     int x;
@@ -10,36 +12,35 @@ typedef struct Player {
     char tile;
 } Player;
 
+void exitError(char* error) {
+    endwin();
+    fprintf(stderr, "ERROR: %s\n", error);
+    exit(EXIT_FAILURE);
+}
+
 Player* createPlayer() {
    Player* player = malloc(sizeof(Player));
-   player->x = 14;
-   player->y = 14;
+   player->x = 7;
+   player->y = 4;
    player->health = MAX_HEALTH;
    player->tile = '@';
    return player;
 }
 
 void mapSetup() {
-    mvprintw(13, 13, "--------");
-    mvprintw(14, 13, "|......|");
-    mvprintw(15, 13, "|......|");
-    mvprintw(16, 13, "|......|");
-    mvprintw(17, 13, "|......|");
-    mvprintw(18, 13, "--------");
+    FILE *fp;
+    char buffer[BUF_SIZE];
+    fp = fopen("map", "r");
+    if (fp == NULL) {
+        exitError("Could not read map. Exiting.");
+    }
 
-    mvprintw(2, 40, "--------");
-    mvprintw(3, 40, "|......|");
-    mvprintw(4, 40, "|......|");
-    mvprintw(5, 40, "|......|");
-    mvprintw(6, 40, "|......|");
-    mvprintw(7, 40, "--------");
-
-    mvprintw(10, 40, "------------");
-    mvprintw(11, 40, "|..........|");
-    mvprintw(12, 40, "|..........|");
-    mvprintw(13, 40, "|..........|");
-    mvprintw(14, 40, "|..........|");
-    mvprintw(15, 40, "------------");
+    int row = 0;
+    while (fgets(buffer, BUF_SIZE, fp)) {
+        mvprintw(row, 0, "%s", buffer);
+        row++;
+    }
+    fclose(fp);
     refresh();
 }
 
