@@ -27,20 +27,40 @@ Player* createPlayer() {
    return player;
 }
 
-void mapSetup() {
+char** readMap() {
     FILE *fp;
     char buffer[BUF_SIZE];
+    char **map;
+
+    map = malloc(BUF_SIZE * sizeof(char *));
+    if (map == NULL) {
+        exitError("Could not allocate memory for map. Exiting.");
+    }
+
+    for (int i = 0; i < BUF_SIZE; i++) {
+        map[i] = malloc(BUF_SIZE * sizeof(char));
+        if (map[i] == NULL) {
+            exitError("Could not allocate memory for map row. Exiting.");
+        }
+    }
+
     fp = fopen("map", "r");
     if (fp == NULL) {
         exitError("Could not read map. Exiting.");
     }
 
     int row = 0;
-    while (fgets(buffer, BUF_SIZE, fp)) {
-        mvprintw(row, 0, "%s", buffer);
+    while (fgets(map[row], BUF_SIZE, fp) && row < BUF_SIZE) {
         row++;
     }
     fclose(fp);
+    return map;
+}
+
+void drawMap(char** map) {
+    for (int row = 0; row < BUF_SIZE; row++) {
+        mvprintw(row, 0,  "%s", map[row]);
+    }
     refresh();
 }
 
@@ -85,20 +105,23 @@ void handleInput(int key, Player* player) {
 
 int main() {
     Player* player;
+    char **map;
     int key;
+
+    map = readMap();
+    player = createPlayer();
 
     // init screen
     initscr();
     noecho();   // don't show typed characters
 
-    mapSetup();
-    player = createPlayer();
+    drawMap(map);
     drawPlayer(player);
 
     // main loop
     while ((key = getch()) != 'q') {
         handleInput(key, player);
-        mapSetup();
+        drawMap(map);
         drawPlayer(player);
     }
 
