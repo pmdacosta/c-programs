@@ -6,8 +6,8 @@
 #define BUF_SIZE 256
 
 typedef struct Player {
-    int x;
-    int y;
+    int col;
+    int row;
     int health;
     char tile;
 } Player;
@@ -20,8 +20,8 @@ void exitError(char* error) {
 
 Player* createPlayer() {
    Player* player = malloc(sizeof(Player));
-   player->x = 7;
-   player->y = 4;
+   player->col = 7;
+   player->row = 4;
    player->health = MAX_HEALTH;
    player->tile = '@';
    return player;
@@ -65,39 +65,40 @@ void drawMap(char** map) {
 }
 
 void drawPlayer(Player* player) {
-    mvprintw(player->y, player->x, "%c", player->tile);
-    move(player->y, player->x);
+    mvprintw(player->row, player->col, "%c", player->tile);
+    move(player->row, player->col);
     refresh();
 }
 
 // returns true if a player/npc can move into that position
-int canMoveTo(int x, int y) {
-    return mvinch(y, x) == '.';
+int canMoveTo(int row, int col) {
+    // mvinch returns the character a y,x coords in the screen
+    return mvinch(row, col) == '.';
 }
 
 // Tries to move player to new postion
-void movePlayer(Player* player, int x, int y) {
-    int newX = player->x + x;
-    int newY = player->y + y;
-    if (canMoveTo(newX, newY)) {
-        player->x += x;
-        player->y += y;
+void movePlayer(Player* player, int row, int col) {
+    int newCol = player->col + col;
+    int newRow = player->row + row;
+    if (canMoveTo(newRow, newCol)) {
+        player->col += col;
+        player->row += row;
     }
 }
 
 void handleInput(int key, Player* player) {
     switch (key) {
         case 'w':
-            movePlayer(player, 0, -1);
-            break;
-        case 'a':
             movePlayer(player, -1, 0);
             break;
+        case 'a':
+            movePlayer(player, 0, -1);
+            break;
         case 's':
-            movePlayer(player, 0, 1);
+            movePlayer(player, 1, 0);
             break;
         case 'd':
-            movePlayer(player, 1, 0);
+            movePlayer(player, 0, 1);
             break;
     }
 
