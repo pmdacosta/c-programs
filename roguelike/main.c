@@ -5,6 +5,22 @@
 #define MAX_HEALTH 20
 #define BUF_SIZE 256
 
+typedef struct Monster {
+
+} Monster;
+
+typedef struct Item {
+} Item;
+
+typedef struct Room {
+    int row;        // top left corner
+    int col;        // top left corner
+    int height;
+    int width;
+    Monster** monsters;
+    Item** items;
+} Room ;
+
 typedef struct Player {
     int col;
     int row;
@@ -57,6 +73,29 @@ char** readMap() {
     return map;
 }
 
+Room* createRoom(int row, int col, int height, int width) {
+    Room* room = malloc(sizeof(Room));
+    if (room == NULL) {
+        exitError("Malloc failed for room");
+    }
+    room->row = row;
+    room->col = col;
+    room->height = height;
+    room->width = width;
+    return room;
+}
+
+Room** generateRooms(int n_rooms) {
+    Room** rooms = malloc(n_rooms * sizeof(Room*));
+    if (rooms == NULL) {
+        exitError("Malloc failed for rooms");
+    }
+
+    rooms[0] = createRoom(3,5,9,12);
+    rooms[1] = createRoom(5,24,6,16);
+    return rooms;
+}
+
 void drawMap(char** map) {
     for (int row = 0; row < BUF_SIZE; row++) {
         mvprintw(row, 0,  "%s", map[row]);
@@ -106,10 +145,13 @@ void handleInput(int key, Player* player) {
 
 int main() {
     Player* player;
+    Room** rooms;
     char **map;
     int key;
+    int n_rooms = 2;
 
     map = readMap();
+    rooms = generateRooms(n_rooms);
     player = createPlayer();
 
     // init screen
