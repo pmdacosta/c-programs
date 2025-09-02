@@ -2,19 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_HEALTH 20
 #define MAP_HEIGTH 40
 #define MAP_WIDTH 128
 
-typedef struct Tiles {
-    char tunnel;
-    char room_wall_top;
-    char room_wall_side;
-    char room_floor;
-} Tiles;
-
-Tiles* TILES;
+typedef struct Position {
+    int row;
+    int col;
+} Position;
 
 typedef struct Monster {
 
@@ -24,8 +21,8 @@ typedef struct Item {
 } Item;
 
 typedef struct Room {
-    int row;        // top left corner
-    int col;        // top left corner
+    Position position;
+    Position doors[4];
     int height;
     int width;
     Monster** monsters;
@@ -33,16 +30,14 @@ typedef struct Room {
 } Room ;
 
 typedef struct Tunnel {
-    int row;
-    int col;
+    Position position;
     int width;
     int height;
     int tile;
 } Tunnel;
 
 typedef struct Player {
-    int col;
-    int row;
+    Position position;
     int health;
     char tile;
 } Player;
@@ -53,18 +48,10 @@ void exitError(char* error) {
     exit(EXIT_FAILURE);
 }
 
-void setupTiles() {
-    TILES = malloc(sizeof(Tiles));
-    TILES->tunnel = '#';
-    TILES->room_floor = '.';
-    TILES->room_wall_side = '|';
-    TILES->room_wall_top = '-';
-}
-
 Player* createPlayer() {
    Player* player = malloc(sizeof(Player));
-   player->col = 7;
-   player->row = 4;
+   player->position.col = 7;
+   player->position.row = 4;
    player->health = MAX_HEALTH;
    player->tile = '@';
    return player;
@@ -119,37 +106,48 @@ char** generateMap(Room** rooms, int n_rooms, Tunnel** tunnels, int n_tunnels) {
 
     for (int room_index = 0; room_index < n_rooms; room_index++) {
         Room* room = rooms[room_index];
-        // top wall
-        for(int col = room->col; col < room->col + room->width; col++) {
-            map[room->row][col] = TILES->room_wall_top;
-        }
-        // bottom wall
-        for(int col = room->col; col < room->col + room->width; col++) {
-            map[room->row + room->height - 1][col] = TILES->room_wall_top;
+        int room_row = room->position.row;
+        int room_col = room->position.col;
+        for (int col = room_col; col < room_col + room->width; col++) {
+            // top wall
+            map[room_row][col] = '-';
+            // bottom wall
+            map[room_row + room->height - 1][col] = '-';
         }
 
         // middle
-        for(int row = room->row + 1; row < room->row + room->height - 1; row++) {
-            map[row][room->col] = TILES->room_wall_side;
-            map[row][room->col + room->width - 1] = TILES->room_wall_side;
-            for(int col = room->col+1; col < room->col + room->width - 1; col++) {
+        for (int row = room_row + 1; row < room_row + room->height - 1; row++) {
+            map[row][room_col] = '|';
+            map[row][room_col + room->width - 1] = '|';
+            for(int col = room_col + 1; col < room_col + room->width - 1; col++) {
                 map[row][col] = '.';
+            }
+        }
+
+        // doors
+        for (int door_index = 0; door_index < 4; door_index++) {
+            int door_row = room->doors[door_index].row;
+            int door_col = room->doors[door_index].col;
+            if (door_row && door_col != -1) {
+                map[door_row][door_col] = 'D';
             }
         }
     }
 
     for (int tunnel_index = 0; tunnel_index < n_tunnels; tunnel_index++) {
         Tunnel* tunnel = tunnels[tunnel_index];
+        int tunnel_row = tunnel->position.row;
+        int tunnel_col = tunnel->position.col;
         
         if (tunnel->height == 0)  {
             // horizontal tunnel
-            for(int col = tunnel->col; col < tunnel->col + tunnel->width; col++) {
-                map[tunnel->row][col] = TILES->tunnel;
+            for (int col = tunnel_col; col < tunnel_col + tunnel->width; col++) {
+                map[tunnel_row][col] = '#';
             }
         } else {
             // vertical tunnel
-            for(int row = tunnel->row; row < tunnel->row + tunnel->height; row++) {
-                map[row][tunnel->col] = TILES->tunnel;
+            for (int row = tunnel_row; row < tunnel_row + tunnel->height; row++) {
+                map[row][tunnel_col] = '#';
             }
         }
     }
@@ -162,10 +160,51 @@ Room* createRoom(int row, int col, int height, int width) {
     if (room == NULL) {
         exitError("Malloc failed for room");
     }
-    room->row = row;
-    room->col = col;
+    room->position.row = row;
+    room->position.col = col;
     room->height = height;
     room->width = width;
+    
+    // generate doors
+    // we do (width/height - 2) + 1 because we don't want doors in the corners
+    int door_chance = 5;
+
+    // top door
+    if (rand() % door_chance == 0) {
+        room->doors[0].row = row;
+        room->doors[0].col = col + rand() % (width - 2) + 1;
+    } else {
+        room->doors[0].row = -1;
+        room->doors[0].col = -1;
+    }
+
+    // bottom door
+    if (rand() % door_chance == 0) {
+        room->doors[1].row = row + height - 1;
+        room->doors[1].col = col + rand() % (width - 2) + 1;
+    } else {
+        room->doors[1].row = -1;
+        room->doors[1].col = -1;
+    }
+
+    // left door
+    if (rand() % door_chance == 0) {
+        room->doors[2].row = row + rand() % (height - 2) + 1;
+        room->doors[2].col = col;
+    } else {
+        room->doors[2].row = -1;
+        room->doors[2].col = -1;
+    }
+
+    // right door
+    if (rand() % door_chance == 0) {
+        room->doors[3].row = row + rand() % (height - 2) + 1;
+        room->doors[3].col = col + width - 1;
+    } else {
+        room->doors[3].row = -1;
+        room->doors[3].col = -1;
+    }
+
     return room;
 }
 
@@ -174,8 +213,8 @@ Tunnel* createTunnel(int row, int col, int height, int width) {
     if (tunnel == NULL) {
         exitError("Malloc failed for room");
     }
-    tunnel->row = row;
-    tunnel->col = col;
+    tunnel->position.row = row;
+    tunnel->position.col = col;
     tunnel->height = height;
     tunnel->width = width;
     return tunnel;
@@ -210,8 +249,8 @@ void drawMap(char** map) {
 }
 
 void drawPlayer(Player* player) {
-    mvprintw(player->row, player->col, "%c", player->tile);
-    move(player->row, player->col);
+    mvprintw(player->position.row, player->position.col, "%c", player->tile);
+    move(player->position.row, player->position.col); // move the cursor to match the player position
     refresh();
 }
 
@@ -229,11 +268,11 @@ int canMoveTo(int row, int col) {
 
 // Tries to move player to new postion
 void movePlayer(Player* player, int row, int col) {
-    int newCol = player->col + col;
-    int newRow = player->row + row;
+    int newCol = player->position.col + col;
+    int newRow = player->position.row + row;
     if (canMoveTo(newRow, newCol)) {
-        player->col += col;
-        player->row += row;
+        player->position.col += col;
+        player->position.row += row;
     }
 }
 
@@ -264,7 +303,7 @@ int main() {
     int n_rooms = 2;
     int n_tunnels = 1;
 
-    setupTiles();
+    srand(time(NULL)); // seed the rand function
     rooms = generateRooms(n_rooms);
     tunnels = generateTunnels(n_tunnels);
     // map = readMap();
