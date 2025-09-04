@@ -7,6 +7,10 @@
 #define MAX_HEALTH 20
 #define MAP_HEIGTH 40
 #define MAP_WIDTH 128
+#define DOOR_TOP    0
+#define DOOR_RIGHT  1
+#define DOOR_BOTTOM 2
+#define DOOR_LEFT   3
 
 typedef struct Position {
     int row;
@@ -29,13 +33,6 @@ typedef struct Room {
     Item** items;
 } Room ;
 
-typedef struct Tunnel {
-    Position position;
-    int width;
-    int height;
-    int tile;
-} Tunnel;
-
 typedef struct Player {
     Position position;
     int health;
@@ -46,6 +43,13 @@ void exitError(char* error) {
     endwin();
     fprintf(stderr, "ERROR: %s\n", error);
     exit(EXIT_FAILURE);
+}
+
+void drawMap(char** map) {
+    for (int row = 0; row < MAP_HEIGTH; row++) {
+        mvprintw(row, 0,  "%s", map[row]);
+    }
+    refresh();
 }
 
 Player* createPlayer() {
@@ -87,7 +91,7 @@ char** readMap() {
     return map;
 }
 
-char** generateMap(Room** rooms, int n_rooms, Tunnel** tunnels, int n_tunnels) {
+char** generateMap(Room** rooms, int n_rooms) {
     char **map;
 
     map = malloc(MAP_HEIGTH * sizeof(char *));
@@ -128,26 +132,15 @@ char** generateMap(Room** rooms, int n_rooms, Tunnel** tunnels, int n_tunnels) {
         for (int door_index = 0; door_index < 4; door_index++) {
             int door_row = room->doors[door_index].row;
             int door_col = room->doors[door_index].col;
-            if (door_row && door_col != -1) {
-                map[door_row][door_col] = 'D';
+            if (room_index == 0 && door_index == DOOR_RIGHT) {
+                if (door_row && door_col != -1) {
+                    map[door_row][door_col] = '+';
+                }
             }
-        }
-    }
-
-    for (int tunnel_index = 0; tunnel_index < n_tunnels; tunnel_index++) {
-        Tunnel* tunnel = tunnels[tunnel_index];
-        int tunnel_row = tunnel->position.row;
-        int tunnel_col = tunnel->position.col;
-        
-        if (tunnel->height == 0)  {
-            // horizontal tunnel
-            for (int col = tunnel_col; col < tunnel_col + tunnel->width; col++) {
-                map[tunnel_row][col] = '#';
-            }
-        } else {
-            // vertical tunnel
-            for (int row = tunnel_row; row < tunnel_row + tunnel->height; row++) {
-                map[row][tunnel_col] = '#';
+            if (room_index == 1 && door_index == DOOR_LEFT) {
+                if (door_row && door_col != -1) {
+                    map[door_row][door_col] = '+';
+                }
             }
         }
     }
@@ -166,58 +159,78 @@ Room* createRoom(int row, int col, int height, int width) {
     room->width = width;
     
     // generate doors
+    int door_chance = 1; // chance of door being generated
+
     // we do (width/height - 2) + 1 because we don't want doors in the corners
-    int door_chance = 5;
-
     // top door
-    if (rand() % door_chance == 0) {
-        room->doors[0].row = row;
-        room->doors[0].col = col + rand() % (width - 2) + 1;
-    } else {
-        room->doors[0].row = -1;
-        room->doors[0].col = -1;
-    }
-
-    // bottom door
-    if (rand() % door_chance == 0) {
-        room->doors[1].row = row + height - 1;
-        room->doors[1].col = col + rand() % (width - 2) + 1;
-    } else {
-        room->doors[1].row = -1;
-        room->doors[1].col = -1;
-    }
-
-    // left door
-    if (rand() % door_chance == 0) {
-        room->doors[2].row = row + rand() % (height - 2) + 1;
-        room->doors[2].col = col;
-    } else {
-        room->doors[2].row = -1;
-        room->doors[2].col = -1;
-    }
+    room->doors[DOOR_TOP].row = row;
+    room->doors[DOOR_TOP].col = col + rand() % (width - 2) + 1;
 
     // right door
-    if (rand() % door_chance == 0) {
-        room->doors[3].row = row + rand() % (height - 2) + 1;
-        room->doors[3].col = col + width - 1;
-    } else {
-        room->doors[3].row = -1;
-        room->doors[3].col = -1;
-    }
+    room->doors[DOOR_RIGHT].row = row + rand() % (height - 2) + 1;
+    room->doors[DOOR_RIGHT].col = col + width - 1;
+
+    // bottom door
+    room->doors[DOOR_BOTTOM].row = row + height - 1;
+    room->doors[DOOR_BOTTOM].col = col + rand() % (width - 2) + 1;
+
+    // left door
+    room->doors[DOOR_LEFT].row = row + rand() % (height - 2) + 1;
+    room->doors[DOOR_LEFT].col = col;
 
     return room;
 }
 
-Tunnel* createTunnel(int row, int col, int height, int width) {
-    Tunnel* tunnel = malloc(sizeof(Tunnel));
-    if (tunnel == NULL) {
-        exitError("Malloc failed for room");
+void connectDoors(char**map, const Position* door1, const Position* door2) {
+    Position current;
+    Position previous;
+    Position backtrack;
+    current.row = door1->row;
+    current.col = door1->col;
+    previous.row = current.row;
+    previous.col = current.col;
+    int step = 0;
+
+    while ( 1 ) {
+        if (map[current.row][current.col - 1] == ' ' && 
+                abs((current.col - 1) - door2->col) < abs(current.col - door2->col)) {
+            previous.col = current.col;
+            current.col = current.col - 1;
+        }
+        else if (map[current.row][current.col + 1] == ' ' &&
+                (abs((current.col + 1) - door2->col) < abs(current.col - door2->col))) {
+            previous.col = current.col;
+            current.col = current.col + 1;
+        }
+        else if (map[current.row - 1][current.col] == ' ' &&
+                (abs((current.row - 1) - door2->row) < abs(current.row - door2->row))) {
+            previous.row = current.row;
+            current.row = current.row - 1;
+        }
+        else if (map[current.row + 1][current.col] == ' ' &&
+                (abs((current.row + 1) - door2->row) < abs(current.row - door2->row))) {
+            previous.row = current.row;
+            current.row = current.row + 1;
+        } else {
+            if (current.row == door2->row && abs(current.col - door2->col) == 1) {
+                return;
+            }
+
+            if (current.col == door2->col && abs(current.row - door2->row) == 1) {
+                return;
+            }
+
+            if (step == 0) {
+                current = previous;
+                step++;
+                continue;
+            } else {
+                return;
+            }
+        }
+        map[current.row][current.col] = '#';
     }
-    tunnel->position.row = row;
-    tunnel->position.col = col;
-    tunnel->height = height;
-    tunnel->width = width;
-    return tunnel;
+
 }
 
 Room** generateRooms(int n_rooms) {
@@ -226,27 +239,16 @@ Room** generateRooms(int n_rooms) {
         exitError("Malloc failed for rooms");
     }
 
-    rooms[0] = createRoom(3,5,9,12);
-    rooms[1] = createRoom(5,24,6,16);
+    rooms[0] = createRoom(1,5,9,12);
+    rooms[1] = createRoom(5,40,6,16);
+
     return rooms;
 }
 
-Tunnel** generateTunnels(int n_tunnels) {
-    Tunnel** tunnels = malloc(n_tunnels * sizeof(Tunnel*));
-    if (tunnels == NULL) {
-        exitError("Malloc failed for rooms");
-    }
-
-    tunnels[0] = createTunnel(7,16,0,9);
-    return tunnels;
+void generateTunnels(char** map, Room** rooms, int n_rooms) {
+    connectDoors(map, &rooms[0]->doors[DOOR_RIGHT], &rooms[1]->doors[DOOR_LEFT]);
 }
 
-void drawMap(char** map) {
-    for (int row = 0; row < MAP_HEIGTH; row++) {
-        mvprintw(row, 0,  "%s", map[row]);
-    }
-    refresh();
-}
 
 void drawPlayer(Player* player) {
     mvprintw(player->position.row, player->position.col, "%c", player->tile);
@@ -261,6 +263,7 @@ int canMoveTo(int row, int col) {
     switch(tile) {
         case '.':
         case '#':
+        case '+':
             return TRUE;
     }
     return FALSE;
@@ -297,22 +300,22 @@ void handleInput(int key, Player* player) {
 int main() {
     Player* player;
     Room** rooms;
-    Tunnel** tunnels;
     char **map;
     int key;
     int n_rooms = 2;
     int n_tunnels = 1;
 
     srand(time(NULL)); // seed the rand function
-    rooms = generateRooms(n_rooms);
-    tunnels = generateTunnels(n_tunnels);
-    // map = readMap();
-    map = generateMap(rooms, n_rooms, tunnels, n_tunnels);
-    player = createPlayer();
 
     // init screen
     initscr();
     noecho();   // don't show typed characters
+
+    rooms = generateRooms(n_rooms);
+    // map = readMap();
+    map = generateMap(rooms, n_rooms);
+    generateTunnels(map, rooms, n_rooms);
+    player = createPlayer();
 
     drawMap(map);
     drawPlayer(player);
