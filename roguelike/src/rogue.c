@@ -1,4 +1,5 @@
 #include "rogue.h"
+#include <stdlib.h>
 
 void exitError(char* error) {
     endwin();
@@ -217,6 +218,22 @@ void generateTunnels(char** map, Room** rooms, int n_rooms) {
     if (rooms[2] != NULL) {
         connectDoors(map, &rooms[1]->doors[DOOR_BOTTOM], &rooms[2]->doors[DOOR_TOP]);
     }
+}
+
+Level* generateLevel() {
+    Level* level = malloc(sizeof(Level));
+    if (level == NULL) {
+        exitError("Could not allocate memory for Level. Exiting");
+    }
+
+    level->n_rooms = 3;
+    level->n_tunnels = 3;
+
+    level->rooms = generateRooms(level->n_rooms);
+    level->map = generateMap(level->rooms, level->n_rooms);
+    generateTunnels(level->map, level->rooms, level->n_rooms);
+
+    return level;
 }
 
 

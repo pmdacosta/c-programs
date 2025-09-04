@@ -53,11 +53,12 @@ void exitError(char* error);
 void drawMap(char** map);
 Player* createPlayer();
 char** readMap();
+Level* generateLevel();
 char** generateMap(Room** rooms, int n_rooms);
-Room* createRoom(int row, int col, int height, int width);
-void connectDoors(char**map, const Position* door1, const Position* door2);
 Room** generateRooms(int n_rooms);
 void generateTunnels(char** map, Room** rooms, int n_rooms);
+Room* createRoom(int row, int col, int height, int width);
+void connectDoors(char**map, const Position* door1, const Position* door2);
 void drawPlayer(Player* player);
 
 /* returns true if a player/npc can move into that position */
