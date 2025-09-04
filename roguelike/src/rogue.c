@@ -1,43 +1,4 @@
-#include <ncurses.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
-#define MAX_HEALTH 20
-#define MAP_HEIGTH 40
-#define MAP_WIDTH 128
-#define DOOR_TOP    0
-#define DOOR_RIGHT  1
-#define DOOR_BOTTOM 2
-#define DOOR_LEFT   3
-
-typedef struct Position {
-    int row;
-    int col;
-} Position;
-
-typedef struct Monster {
-
-} Monster;
-
-typedef struct Item {
-} Item;
-
-typedef struct Room {
-    Position position;
-    Position doors[4];
-    int height;
-    int width;
-    Monster** monsters;
-    Item** items;
-} Room ;
-
-typedef struct Player {
-    Position position;
-    int health;
-    char tile;
-} Player;
+#include "rogue.h"
 
 void exitError(char* error) {
     endwin();
@@ -132,16 +93,8 @@ char** generateMap(Room** rooms, int n_rooms) {
         for (int door_index = 0; door_index < 4; door_index++) {
             int door_row = room->doors[door_index].row;
             int door_col = room->doors[door_index].col;
-            if (room_index == 0 && door_index == DOOR_RIGHT) {
-                if (door_row && door_col != -1) {
-                    map[door_row][door_col] = '+';
-                }
-            }
-            if (room_index == 1 && door_index == DOOR_LEFT) {
-                if (door_row && door_col != -1) {
-                    map[door_row][door_col] = '+';
-                }
-            }
+            map[door_row][door_col] = '+';
+            map[door_row][door_col] = '+';
         }
     }
 
@@ -297,37 +250,3 @@ void handleInput(int key, Player* player) {
 
 }
 
-int main() {
-    Player* player;
-    Room** rooms;
-    char **map;
-    int key;
-    int n_rooms = 2;
-    int n_tunnels = 1;
-
-    srand(time(NULL)); // seed the rand function
-
-    // init screen
-    initscr();
-    noecho();   // don't show typed characters
-
-    rooms = generateRooms(n_rooms);
-    // map = readMap();
-    map = generateMap(rooms, n_rooms);
-    generateTunnels(map, rooms, n_rooms);
-    player = createPlayer();
-
-    drawMap(map);
-    drawPlayer(player);
-
-    // main loop
-    while ((key = getch()) != 'q') {
-        handleInput(key, player);
-        drawMap(map);
-        drawPlayer(player);
-    }
-
-    // 
-    endwin();
-    return 0;
-}

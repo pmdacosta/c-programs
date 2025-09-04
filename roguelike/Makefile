@@ -1,9 +1,14 @@
-rogue: main.c
-	clang -lncurses main.c -o rogue
+CC = gcc
+CFLAGS = -lncurses
+SOURCES = $(wildcard src/*.c)
+OUT = rogue
+
+rogue: $(SOURCES)
+	$(CC) $(CFLAGS) $(SOURCES) -o $(OUT)
 	ctags -R .
 
 run:
-	./rogue
+	./$(OUT)
 
 clean:
-	rogue
+	rm $(OUT)
