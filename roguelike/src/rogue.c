@@ -71,6 +71,12 @@ char** generateMap(Room** rooms, int n_rooms) {
 
     for (int room_index = 0; room_index < n_rooms; room_index++) {
         Room* room = rooms[room_index];
+        if (room == NULL) {
+            continue;               // sanity check
+                                    // there was an error creating room
+                                    // so it's null
+        }
+
         int room_row = room->position.row;
         int room_col = room->position.col;
         for (int col = room_col; col < room_col + room->width; col++) {
@@ -102,6 +108,13 @@ char** generateMap(Room** rooms, int n_rooms) {
 }
 
 Room* createRoom(int row, int col, int height, int width) {
+    // sanity check
+    // checking in the room is inside the map limits
+    if (row < 0 || row >= MAP_HEIGTH) return NULL;
+    if (col < 0 || col >= MAP_WIDTH) return NULL;
+    if (row + height - 1 < 0 || row + height - 1 >= MAP_HEIGTH) return NULL;
+    if (col + width - 1 < 0 || col + width - 1 >= MAP_WIDTH) return NULL;
+
     Room* room = malloc(sizeof(Room));
     if (room == NULL) {
         exitError("Malloc failed for room");
@@ -194,12 +207,16 @@ Room** generateRooms(int n_rooms) {
 
     rooms[0] = createRoom(1,5,9,12);
     rooms[1] = createRoom(5,40,6,16);
+    rooms[2] = createRoom(18,30,12,12);
 
     return rooms;
 }
 
 void generateTunnels(char** map, Room** rooms, int n_rooms) {
     connectDoors(map, &rooms[0]->doors[DOOR_RIGHT], &rooms[1]->doors[DOOR_LEFT]);
+    if (rooms[2] != NULL) {
+        connectDoors(map, &rooms[1]->doors[DOOR_BOTTOM], &rooms[2]->doors[DOOR_TOP]);
+    }
 }
 
 

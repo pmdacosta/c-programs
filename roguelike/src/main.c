@@ -5,8 +5,8 @@ int main() {
     Room** rooms;
     char **map;
     int key;
-    int n_rooms = 2;
-    int n_tunnels = 1;
+    int n_rooms = 3;
+    int n_tunnels = 2;
 
     srand(time(NULL)); // seed the rand function
 

@@ -1,3 +1,6 @@
+#ifndef ROGUE_H
+#define ROGUE_H
+
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,3 +59,5 @@ int canMoveTo(int row, int col);
 /* Tries to move player to new postion */
 void movePlayer(Player* player, int row, int col);
 void handleInput(int key, Player* player);
+
+#endif
