@@ -36,6 +36,13 @@ typedef struct Room {
     Item** items;
 } Room ;
 
+typedef struct Level {
+    char**map;
+    Room** rooms;
+    int n_rooms;
+    int n_tunnels;
+} Level;
+
 typedef struct Player {
     Position position;
     int health;

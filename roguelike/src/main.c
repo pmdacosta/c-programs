@@ -2,6 +2,7 @@
 
 int main() {
     Player* player;
+    Level** level;
     Room** rooms;
     char **map;
     int key;
@@ -10,15 +11,15 @@ int main() {
 
     srand(time(NULL)); // seed the rand function
 
-    // init screen
-    initscr();
-    noecho();   // don't show typed characters
-
     rooms = generateRooms(n_rooms);
     // map = readMap();
     map = generateMap(rooms, n_rooms);
     generateTunnels(map, rooms, n_rooms);
     player = createPlayer();
+
+    // init screen
+    initscr();
+    noecho();   // don't show typed characters
 
     drawMap(map);
     drawPlayer(player);
