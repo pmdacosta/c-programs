@@ -64,14 +64,15 @@ void generateTunnels(char** map, Room** rooms, int n_rooms);
 void generateMonsters(Level* level);
 Room* createRoom(int row, int col, int height, int width);
 void connectDoors(char**map, const Position* door1, const Position* door2);
+void updateMonsters(Level* level);
 void drawPlayer(Player* player);
 void drawMonsters(Monster** monsters, int n_monsters);
 
 /* returns true if a player/npc can move into that position */
-int canMoveTo(int row, int col);
+int canMoveTo(Level* level, int row, int col);
 
 /* Tries to move player to new postion */
-void movePlayer(Player* player, int row, int col);
-void handleInput(int key, Player* player);
+void movePlayer(Level* level, int row, int col);
+void handleInput(Level* level, int key);
 
 #endif

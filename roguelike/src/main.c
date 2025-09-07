@@ -18,7 +18,8 @@ int main() {
 
     // main loop
     while ((key = getch()) != 'q') {
-        handleInput(key, level->player);
+        handleInput(level, key);
+        updateMonsters(level);
         drawMap(level->map);
         drawMonsters(level->monsters, level->n_monsters);
         drawPlayer(level->player);

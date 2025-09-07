@@ -296,9 +296,9 @@ void drawMonsters(Monster** monsters, int n_monsters) {
 }
 
 // returns true if a player/npc can move into that position
-int canMoveTo(int row, int col) {
+int canMoveTo(Level* level, int row, int col) {
     // mvinch returns the character a y,x coords in the screen
-    int tile = mvinch(row, col);
+    char tile = level->map[row][col];
     switch(tile) {
         case '.':
         case '#':
@@ -309,30 +309,62 @@ int canMoveTo(int row, int col) {
 }
 
 // Tries to move player to new position
-void movePlayer(Player* player, int row, int col) {
+void movePlayer(Level* level, int row, int col) {
+    Player* player = level->player;
     int newCol = player->position.col + col;
     int newRow = player->position.row + row;
-    if (canMoveTo(newRow, newCol)) {
+    if (canMoveTo(level, newRow, newCol)) {
         player->position.col += col;
         player->position.row += row;
     }
 }
 
-void handleInput(int key, Player* player) {
+void handleInput(Level* level, int key) {
     switch (key) {
         case 'w':
-            movePlayer(player, -1, 0);
+            movePlayer(level, -1, 0);
             break;
         case 'a':
-            movePlayer(player, 0, -1);
+            movePlayer(level, 0, -1);
             break;
         case 's':
-            movePlayer(player, 1, 0);
+            movePlayer(level, 1, 0);
             break;
         case 'd':
-            movePlayer(player, 0, 1);
+            movePlayer(level, 0, 1);
             break;
     }
 
+}
+
+void updateMonsters(Level *level) {
+    for (int i = 0; i < level->n_monsters; i++) {
+        Monster* monster = level->monsters[i];
+        if (monster->health == 0) continue;
+
+        int newRow = monster->position.row;
+        int newCol = monster->position.col;
+        int move_horizontal = rand() % 2;
+        if (move_horizontal) {
+            int right = rand() % 2 ;
+            if (right) {
+                newCol++; // move right
+            } else {
+                newCol--; // move left
+            }
+        } else {
+            int up = rand() % 2 ;
+            if (up) {
+                newRow--;
+            } else {
+                newRow++;
+            }
+        }
+
+        if (canMoveTo(level, newRow, newCol)) {
+            monster->position.row = newRow;
+            monster->position.col = newCol;
+        }
+    }
 }
 
