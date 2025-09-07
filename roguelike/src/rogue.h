@@ -21,7 +21,10 @@ typedef struct Position {
 } Position;
 
 typedef struct Monster {
-
+    char tile;
+    int health;
+    int attack;
+    Position position;
 } Monster;
 
 typedef struct Item {
@@ -32,16 +35,8 @@ typedef struct Room {
     Position doors[4];
     int height;
     int width;
-    Monster** monsters;
     Item** items;
 } Room ;
-
-typedef struct Level {
-    char**map;
-    Room** rooms;
-    int n_rooms;
-    int n_tunnels;
-} Level;
 
 typedef struct Player {
     Position position;
@@ -49,17 +44,28 @@ typedef struct Player {
     char tile;
 } Player;
 
+typedef struct Level {
+    char**map;
+    Room** rooms;
+    Monster** monsters;
+    Player* player;
+    int n_rooms;
+    int n_tunnels;
+    int n_monsters;
+} Level;
+
 void exitError(char* error);
 void drawMap(char** map);
-Player* createPlayer();
 char** readMap();
 Level* generateLevel();
 char** generateMap(Room** rooms, int n_rooms);
 Room** generateRooms(int n_rooms);
 void generateTunnels(char** map, Room** rooms, int n_rooms);
+void generateMonsters(Level* level);
 Room* createRoom(int row, int col, int height, int width);
 void connectDoors(char**map, const Position* door1, const Position* door2);
 void drawPlayer(Player* player);
+void drawMonsters(Monster** monsters, int n_monsters);
 
 /* returns true if a player/npc can move into that position */
 int canMoveTo(int row, int col);

@@ -14,15 +14,6 @@ void drawMap(char** map) {
     refresh();
 }
 
-Player* createPlayer() {
-   Player* player = malloc(sizeof(Player));
-   player->position.col = 7;
-   player->position.row = 4;
-   player->health = MAX_HEALTH;
-   player->tile = '@';
-   return player;
-}
-
 char** readMap() {
     FILE *fp;
     char buffer[MAP_WIDTH];
@@ -220,6 +211,35 @@ void generateTunnels(char** map, Room** rooms, int n_rooms) {
     }
 }
 
+void generateMonsters(Level* level) {
+    level->monsters = malloc(level->n_monsters * sizeof(Monster*));
+    if (level->monsters == NULL) {
+        exitError("Could not allocate memory for monsters. Exiting");
+    }
+    
+    int monster_index = 0;
+    for (int room_i = 0; room_i < level->n_rooms; room_i++) { 
+        Monster* monster = malloc(sizeof(Monster));
+        if (monster == NULL) {
+            exitError("Could not allocate memory for monster. Exiting");
+        }
+
+        monster->attack = 1;
+        monster->health = 2;
+        monster->tile = 'X';
+
+        Room* room = level->rooms[room_i];
+        int monster_row = room->position.row + rand() % (room->height - 2) + 1;
+        int monster_col = room->position.col + rand() % (room->width - 2) + 1;
+        monster->position.row = monster_row;
+        monster->position.col = monster_col;
+        level->monsters[monster_index] = monster;
+
+        monster_index++;
+        if (monster_index == level->n_monsters) break;
+    }
+}
+
 Level* generateLevel() {
     Level* level = malloc(sizeof(Level));
     if (level == NULL) {
@@ -227,11 +247,35 @@ Level* generateLevel() {
     }
 
     level->n_rooms = 3;
-    level->n_tunnels = 3;
+    level->n_tunnels = 2;
+    level->n_monsters = 3;
 
     level->rooms = generateRooms(level->n_rooms);
     level->map = generateMap(level->rooms, level->n_rooms);
     generateTunnels(level->map, level->rooms, level->n_rooms);
+    generateMonsters(level);
+
+    level->player = malloc(sizeof(Player));
+    if (level->player == NULL) {
+        exitError("Could not allocate memory for player. Exiting.");
+    }
+    int starting_room = rand() % level->n_rooms;
+    int starting_room_height = level->rooms[starting_room]->height;
+    int starting_room_width = level->rooms[starting_room]->width;
+    int starting_room_row = level->rooms[starting_room]->position.row;
+    int starting_room_col = level->rooms[starting_room]->position.col;
+    while (1) {
+        int player_row = starting_room_row + rand() % (starting_room_height - 2) + 1;
+        int player_col = starting_room_col + rand() % (starting_room_width - 2) + 1;
+        if (player_row != level->monsters[starting_room]->position.row ||
+                player_col != level->monsters[starting_room]->position.col) {
+            level->player->position.row = player_row;
+            level->player->position.col = player_col;
+            break;
+        }
+    }
+    level->player->health = MAX_HEALTH;
+    level->player->tile = '@';
 
     return level;
 }
@@ -240,6 +284,14 @@ Level* generateLevel() {
 void drawPlayer(Player* player) {
     mvprintw(player->position.row, player->position.col, "%c", player->tile);
     move(player->position.row, player->position.col); // move the cursor to match the player position
+    refresh();
+}
+
+void drawMonsters(Monster** monsters, int n_monsters) {
+    for (int i = 0; i < n_monsters; i++) {
+        if (monsters[i] == NULL) continue;
+        mvprintw(monsters[i]->position.row, monsters[i]->position.col, "%c", monsters[i]->tile);
+    }
     refresh();
 }
 
@@ -256,7 +308,7 @@ int canMoveTo(int row, int col) {
     return FALSE;
 }
 
-// Tries to move player to new postion
+// Tries to move player to new position
 void movePlayer(Player* player, int row, int col) {
     int newCol = player->position.col + col;
     int newRow = player->position.row + row;
