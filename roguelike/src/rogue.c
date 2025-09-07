@@ -1,4 +1,5 @@
 #include "rogue.h"
+#include <ncurses.h>
 #include <stdlib.h>
 
 void exitError(char* error) {
@@ -299,6 +300,11 @@ void drawMonsters(Monster** monsters, int n_monsters) {
 int canMoveTo(Level* level, int row, int col) {
     // mvinch returns the character a y,x coords in the screen
     char tile = level->map[row][col];
+    if (level->player->position.row == row && level->player->position.col == col) return FALSE;
+    for (int i = 0; i < level->n_monsters; i++) {
+        if (level->monsters[i]->position.row == row && level->monsters[i]->position.col == col)
+            return FALSE;
+    }
     switch(tile) {
         case '.':
         case '#':
