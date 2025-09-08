@@ -12,7 +12,7 @@ struct Game {
 };
 
 int sdl_initialize(struct Game* game); 
-void game_cleanup(struct Game* game);
+void game_cleanup(struct Game* game, int exit_status);
 
 int main() {
     struct Game game = {
@@ -20,22 +20,22 @@ int main() {
         .renderer = NULL
     };
     if (sdl_initialize(&game) != EXIT_SUCCESS) {
-        game_cleanup(&game);
-        exit(EXIT_FAILURE);
+        game_cleanup(&game, EXIT_FAILURE);
     }
 
     SDL_RenderClear(game.renderer);
     SDL_RenderPresent(game.renderer);
     SDL_Delay(5000);
 
-    game_cleanup(&game);
+    game_cleanup(&game, EXIT_SUCCESS);
     return EXIT_SUCCESS;
 }
 
-void game_cleanup(struct Game* game) {
+void game_cleanup(struct Game* game, int exit_status) {
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
     SDL_Quit();
+    exit (exit_status);
 }
 
 int sdl_initialize(struct Game* game) {
