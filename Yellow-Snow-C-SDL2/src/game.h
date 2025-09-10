@@ -4,7 +4,6 @@
 #include "main.h"
 
 struct Game {
-    SDL_Event event;
     SDL_Window* window;
     SDL_Renderer* renderer;
 };

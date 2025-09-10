@@ -1,7 +1,9 @@
 #include "game.h"
 #include "main.h"
 #include <SDL2/SDL_error.h>
+#include <SDL2/SDL_events.h>
 #include <SDL2/SDL_render.h>
+#include <SDL2/SDL_scancode.h>
 #include <SDL2/SDL_video.h>
 
 struct Game* game_new() {
@@ -19,6 +21,36 @@ struct Game* game_new() {
 }
 
 int game_run(struct Game *game) {
+    SDL_Event event;
+
+    for (;;) {
+        while(SDL_PollEvent(&event)) {
+            switch (event.type) {
+                case SDL_QUIT: 
+                    {
+                        return 0;
+                    } break;
+                case SDL_KEYDOWN:
+                    {
+                        switch(event.key.keysym.scancode) {
+                            case SDL_SCANCODE_Q: 
+                                {
+                                    return 0;
+                                } break;
+                            default:
+                                break;
+                        }
+                    } break;
+                default:
+                    break;
+            }
+        }
+
+        SDL_RenderClear(game->renderer);
+        SDL_RenderPresent(game->renderer);
+        SDL_Delay(16);
+    }
+
     return 0;
 }
 
