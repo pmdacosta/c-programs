@@ -1,5 +1,7 @@
 #include "game.h"
 #include "main.h"
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_render.h>
 
 int game_new(struct Game* game) {
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -29,11 +31,18 @@ int game_new(struct Game* game) {
         return 1;
     }
 
+    game->player.rect.x = (WINDOW_WIDTH - game->player.rect.w) / 2;
+    game->player.rect.y = 377;
+    game->player.flip = 0;
+
     return 0;
 }
 
 int game_run(struct Game* game) {
     SDL_Event event;
+    int mouse_x = 0;
+    int prev_mouse_x = 0;
+    // const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
     for (;;) {
         while(SDL_PollEvent(&event)) {
@@ -53,13 +62,24 @@ int game_run(struct Game* game) {
                                 break;
                         }
                     } break;
+                case SDL_MOUSEMOTION:
+                    {
+                        prev_mouse_x = mouse_x;
+                        mouse_x = event.motion.x;
+                    } break;
                 default:
                     break;
             }
         }
 
+        player_update(&game->player, mouse_x, prev_mouse_x);
+
         SDL_RenderClear(game->renderer);
+
         SDL_RenderCopy(game->renderer, game->background_texture, 0, 0);
+        SDL_RenderCopyEx(game->renderer, game->player.image, 
+                0, &game->player.rect, 0, 0, game->player.flip); 
+
         SDL_RenderPresent(game->renderer);
         SDL_Delay(16);
     }
@@ -68,6 +88,7 @@ int game_run(struct Game* game) {
 }
 
 void game_cleanup(struct Game *game) {
+    SDL_DestroyTexture(game->player.image);
     SDL_DestroyTexture(game->background_texture);
     SDL_DestroyWindow(game->window);
     SDL_DestroyRenderer(game->renderer);
@@ -98,6 +119,31 @@ int game_load_media(struct Game *game) {
         return 1;
     }
 
+    struct Player* player = &game->player;
+    player->image = IMG_LoadTexture(game->renderer, "images/player.png");
+    if (!player->image) {
+        fprintf(stderr, "%s:%d: IMG_LoadTexture failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
+    if (SDL_QueryTexture(player->image, 0, 0,
+                &player->rect.w, &player->rect.h)) {
+        fprintf(stderr, "%s:%d: SDL_QueryTexture failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
 
     return 0;
 }
+
+// Player functions
+void player_update(struct Player *player, int mouse_x, int prev_mouse_x) {
+    if (mouse_x - prev_mouse_x > 0) {
+        player->flip = 0;
+    } else if (mouse_x - prev_mouse_x < 0) {
+        player->flip = SDL_FLIP_HORIZONTAL;
+    }
+    player->rect.x = mouse_x - player->rect.w / 2;
+}
+
