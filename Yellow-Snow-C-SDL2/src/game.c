@@ -2,6 +2,7 @@
 #include "main.h"
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_render.h>
+#include <SDL2/SDL_scancode.h>
 
 int game_new(struct Game* game) {
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -34,15 +35,13 @@ int game_new(struct Game* game) {
     game->player.rect.x = (WINDOW_WIDTH - game->player.rect.w) / 2;
     game->player.rect.y = 377;
     game->player.flip = 0;
+    game->player.speed = 5;
 
     return 0;
 }
 
 int game_run(struct Game* game) {
     SDL_Event event;
-    int mouse_x = 0;
-    int prev_mouse_x = 0;
-    // const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
     for (;;) {
         while(SDL_PollEvent(&event)) {
@@ -62,17 +61,12 @@ int game_run(struct Game* game) {
                                 break;
                         }
                     } break;
-                case SDL_MOUSEMOTION:
-                    {
-                        prev_mouse_x = mouse_x;
-                        mouse_x = event.motion.x;
-                    } break;
                 default:
                     break;
             }
         }
 
-        player_update(&game->player, mouse_x, prev_mouse_x);
+        player_update(&game->player);
 
         SDL_RenderClear(game->renderer);
 
@@ -138,12 +132,24 @@ int game_load_media(struct Game *game) {
 }
 
 // Player functions
-void player_update(struct Player *player, int mouse_x, int prev_mouse_x) {
-    if (mouse_x - prev_mouse_x > 0) {
+void player_update(struct Player *player) {
+    const Uint8* keystate = SDL_GetKeyboardState(NULL);
+    int x = player->rect.x;
+    int w = player->rect.w;
+    if (keystate[SDL_SCANCODE_RIGHT]) {
+        x += player->speed;
+        if (x + w >= WINDOW_WIDTH - 1) {
+            x = WINDOW_WIDTH - w - 1;
+        }
         player->flip = 0;
-    } else if (mouse_x - prev_mouse_x < 0) {
+    } 
+    if (keystate[SDL_SCANCODE_LEFT]) {
+        x -= player->speed;
+        if (x <= 0) {
+            x = 0;
+        }
         player->flip = SDL_FLIP_HORIZONTAL;
     }
-    player->rect.x = mouse_x - player->rect.w / 2;
+    player->rect.x = x;
 }
 

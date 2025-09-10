@@ -8,6 +8,7 @@ struct Player {
     SDL_Texture* image;
     SDL_Rect rect; 
     SDL_RendererFlip flip;
+    Uint8 speed;
 };
 
 struct Game {
@@ -25,6 +26,6 @@ int game_load_media(struct Game* game);
 
 int player_new(struct Player* player);
 void player_free(struct Player* player);
-void player_update(struct Player *player, int mouse_x, int prev_mouse_x);
+void player_update(struct Player *player);
 
 #endif
