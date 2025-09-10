@@ -8,8 +8,8 @@ struct Game {
     SDL_Renderer* renderer;
 };
 
-struct Game* game_new();
-void game_free(struct Game* game);
+int game_new(struct Game* game);
+void game_cleanup(struct Game* game);
 int game_run(struct Game* game);
 int game_initialize(struct Game* game);
 
