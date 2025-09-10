@@ -1,10 +1,5 @@
 #include "game.h"
 #include "main.h"
-#include <SDL2/SDL_error.h>
-#include <SDL2/SDL_events.h>
-#include <SDL2/SDL_render.h>
-#include <SDL2/SDL_scancode.h>
-#include <SDL2/SDL_video.h>
 
 int game_new(struct Game* game) {
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -28,10 +23,16 @@ int game_new(struct Game* game) {
         return 1;
     }
 
+    if (game_load_media(game)) {
+        fprintf(stderr, "%s:%d: game_load_media failed\n",
+                __FILE__, __LINE__);
+        return 1;
+    }
+
     return 0;
 }
 
-int game_run(struct Game *game) {
+int game_run(struct Game* game) {
     SDL_Event event;
 
     for (;;) {
@@ -58,6 +59,7 @@ int game_run(struct Game *game) {
         }
 
         SDL_RenderClear(game->renderer);
+        SDL_RenderCopy(game->renderer, game->background_texture, 0, 0);
         SDL_RenderPresent(game->renderer);
         SDL_Delay(16);
     }
@@ -66,7 +68,36 @@ int game_run(struct Game *game) {
 }
 
 void game_cleanup(struct Game *game) {
+    SDL_DestroyTexture(game->background_texture);
     SDL_DestroyWindow(game->window);
     SDL_DestroyRenderer(game->renderer);
+    IMG_Quit();
     SDL_Quit();
+}
+
+int game_load_media(struct Game *game) {
+    if (!IMG_Init(IMG_INIT_PNG)) {
+        fprintf(stderr, "%s:%d: IMG_Init failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
+    SDL_Surface* icon = IMG_Load("images/yellow.png");
+    if (!icon) {
+        fprintf(stderr, "%s:%d: IMG_Load failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+    SDL_SetWindowIcon(game->window, icon);
+    SDL_FreeSurface(icon);
+
+    game->background_texture = IMG_LoadTexture(game->renderer, "images/background.png");
+    if (!game->background_texture) {
+        fprintf(stderr, "%s:%d: IMG_LoadTexture failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
+
+    return 0;
 }

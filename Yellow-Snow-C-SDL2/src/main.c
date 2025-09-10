@@ -1,9 +1,8 @@
 #include "game.h"
 
-int main() {
+int main(void) {
     struct Game game;
 
-    
     if (game_new(&game)) {
         fprintf(stderr, "%s:%d: Error initializing game\n", __FILE__, __LINE__);
         return 1;
