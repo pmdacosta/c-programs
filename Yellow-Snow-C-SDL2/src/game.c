@@ -1,8 +1,6 @@
 #include "game.h"
 #include "main.h"
-#include <SDL2/SDL_events.h>
-#include <SDL2/SDL_render.h>
-#include <SDL2/SDL_scancode.h>
+#include <stdlib.h>
 
 int game_new(struct Game* game) {
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -32,10 +30,15 @@ int game_new(struct Game* game) {
         return 1;
     }
 
+    // setup player
     game->player.rect.x = (WINDOW_WIDTH - game->player.rect.w) / 2;
     game->player.rect.y = 377;
     game->player.flip = 0;
     game->player.speed = 5;
+
+    // setup flakes
+    game->flakes = 0;
+    game->flake_count = 0;
 
     return 0;
 }
@@ -68,11 +71,24 @@ int game_run(struct Game* game) {
 
         player_update(&game->player);
 
+        if (rand() % 200 == 0) {
+            game->flakes = flake_add(game);
+        }
+
+        flakes_update(game);
+
         SDL_RenderClear(game->renderer);
 
         SDL_RenderCopy(game->renderer, game->background_texture, 0, 0);
-        SDL_RenderCopyEx(game->renderer, game->player.image, 
+        SDL_RenderCopyEx(game->renderer, game->player.texture, 
                 0, &game->player.rect, 0, 0, game->player.flip); 
+
+        struct Flake* flake = game->flakes;
+        while(flake) {
+            SDL_RenderCopy(game->renderer, flake->texture
+                    , 0, &flake->rect);
+            flake = flake->next;
+        }
 
         SDL_RenderPresent(game->renderer);
         SDL_Delay(16);
@@ -82,7 +98,17 @@ int game_run(struct Game* game) {
 }
 
 void game_cleanup(struct Game *game) {
-    SDL_DestroyTexture(game->player.image);
+    struct Flake* flake = game->flakes;
+
+    while(flake) {
+        struct Flake* next = flake->next;
+        free(flake);
+        flake = next;
+    }
+
+    SDL_DestroyTexture(game->yellow_flake);
+    SDL_DestroyTexture(game->white_flake);
+    SDL_DestroyTexture(game->player.texture);
     SDL_DestroyTexture(game->background_texture);
     SDL_DestroyWindow(game->window);
     SDL_DestroyRenderer(game->renderer);
@@ -114,15 +140,37 @@ int game_load_media(struct Game *game) {
     }
 
     struct Player* player = &game->player;
-    player->image = IMG_LoadTexture(game->renderer, "images/player.png");
-    if (!player->image) {
+    player->texture = IMG_LoadTexture(game->renderer, "images/player.png");
+    if (!player->texture) {
         fprintf(stderr, "%s:%d: IMG_LoadTexture failed: %s\n",
                 __FILE__, __LINE__, IMG_GetError());
         return 1;
     }
 
-    if (SDL_QueryTexture(player->image, 0, 0,
+    if (SDL_QueryTexture(player->texture, 0, 0,
                 &player->rect.w, &player->rect.h)) {
+        fprintf(stderr, "%s:%d: SDL_QueryTexture failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
+    game->white_flake = IMG_LoadTexture(game->renderer, "images/white.png");
+    if (!game->white_flake) {
+        fprintf(stderr, "%s:%d: IMG_LoadTexture failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
+    game->yellow_flake = IMG_LoadTexture(game->renderer, "images/yellow.png");
+    if (!game->yellow_flake) {
+        fprintf(stderr, "%s:%d: IMG_LoadTexture failed: %s\n",
+                __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
+
+    if (SDL_QueryTexture(game->white_flake, 0, 0, 
+                &game->flake_rect.w, &game->flake_rect.h)) {
         fprintf(stderr, "%s:%d: SDL_QueryTexture failed: %s\n",
                 __FILE__, __LINE__, IMG_GetError());
         return 1;
@@ -153,3 +201,55 @@ void player_update(struct Player *player) {
     player->rect.x = x;
 }
 
+// Flake functions
+struct Flake* flake_add(struct Game* game) {
+    struct Flake* flake = malloc(sizeof(struct Flake));
+    if (!flake) {
+        fprintf(stderr, "%s:%d: malloc failed: %s\n",
+                __FILE__, __LINE__, SDL_GetError());
+        return 0;
+    }
+    flake->next = game->flakes;
+    flake->rect = game->flake_rect;
+
+    flake->rect.y = -flake->rect.h;
+    flake->rect.x = rand() % (WINDOW_WIDTH - flake->rect.w);
+
+    flake->type = rand() % 2;
+    if (flake->type == WHITE_FLAKE) {
+        flake->texture = game->white_flake;
+    } else {
+        flake->texture = game->yellow_flake;
+    }
+
+    return flake;
+}
+
+void flakes_update(struct Game* game) {
+    struct Flake *flake = game->flakes;
+    struct Flake *previous_flake = 0;
+
+    while (flake) {
+        flake->rect.y++;
+        if (flake->rect.y >= WINDOW_HEIGHT) {
+            if (!previous_flake) {
+                // we're at the head
+                game->flakes = flake->next;
+                free(flake);
+                if (!game->flakes) {
+                    return;
+                }
+                flake = game->flakes;
+            } else {
+                previous_flake->next = flake->next;
+                free(flake);
+                flake = previous_flake;
+            }
+            game->flake_count--;
+            printf("flake count: %d\n", game->flake_count);
+        }
+
+        previous_flake = flake;
+        flake = flake->next;
+    }
+}
