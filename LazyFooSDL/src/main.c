@@ -3,7 +3,7 @@
 
 SDL_Window* GlobalWindow = 0;
 SDL_Surface* GlobalScreenSurface = 0;
-SDL_Surface* GlobalHelloWorld = 0;
+SDL_Surface* GlobalXOut = 0;
 
 int main(void) {
 
@@ -19,7 +19,7 @@ int main(void) {
         return 1;
     }
 
-    SDL_BlitSurface(GlobalHelloWorld, 0, GlobalScreenSurface, 0);
+    SDL_BlitSurface(GlobalXOut, 0, GlobalScreenSurface, 0);
     SDL_UpdateWindowSurface(GlobalWindow);
 
     SDL_Event event;
@@ -62,8 +62,8 @@ int Init(void) {
 }
 
 int LoadMedia(void) {
-    GlobalHelloWorld = SDL_LoadBMP("images/hello_world.bmp");
-    if (!GlobalHelloWorld) {
+    GlobalXOut = SDL_LoadBMP("images/x.bmp");
+    if (!GlobalXOut) {
         fprintf(stderr, "%s:%d: SDL_LoadBMP failed: %s\n", __FILE__, __LINE__, SDL_GetError());
         return 1;
     }
@@ -72,7 +72,7 @@ int LoadMedia(void) {
 }
 
 void Cleanup(void) {
-    SDL_FreeSurface(GlobalHelloWorld);
+    SDL_FreeSurface(GlobalXOut);
     SDL_DestroyWindow(GlobalWindow);
     SDL_Quit();
 }
