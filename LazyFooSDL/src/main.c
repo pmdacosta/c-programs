@@ -1,9 +1,9 @@
 #include "main.h"
+#include <SDL2/SDL_surface.h>
 
 SDL_Window* GlobalWindow = 0;
 SDL_Surface* GlobalScreenSurface = 0;
-SDL_Surface* GlobalCurrentSurface = 0;
-SDL_Surface* GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_TOTAL];
+SDL_Surface* GlobalStretchedSurface = 0;
 
 /* Initliaze game
  * returns 0 on success or 1 otherwise */
@@ -30,17 +30,10 @@ int Init(void) {
 }
 
 int LoadMedia(void) {
-    GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT] = LoadSurface("images/press.bmp");
-    GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_UP] = LoadSurface("images/up.bmp");
-    GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_DOWN] = LoadSurface("images/down.bmp");
-    GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_LEFT] = LoadSurface("images/left.bmp");
-    GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_RIGHT] = LoadSurface("images/right.bmp");
-
-    for (int i = 0; i < KEY_PRESS_SURFACE_TOTAL; ++i) {
-        if (!GlobalKeyPressSurfaces[i]) {
-            fprintf(stderr, "%s:%d: LoadSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
-            return 1;
-        }
+    GlobalStretchedSurface = LoadSurface("images/stretch.bmp");
+    if (!GlobalStretchedSurface) {
+        fprintf(stderr, "%s:%d: LoadSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        return 1;
     }
 
     return 0;
@@ -59,7 +52,15 @@ SDL_Surface* LoadSurface(const char* file) {
         return 0;
     }
 
-    return LoadedSurface;
+    SDL_Surface* OptimizedSurface = SDL_ConvertSurface(LoadedSurface, LoadedSurface->format, 0);
+    if (!OptimizedSurface) {
+        fprintf(stderr, "%s:%d: SDL_ConvertSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        return 0;
+    }
+
+    SDL_FreeSurface(LoadedSurface);
+
+    return OptimizedSurface;
 }
 
 int main(void) {
@@ -76,7 +77,8 @@ int main(void) {
         return 1;
     }
 
-    GlobalCurrentSurface = GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT];
+    SDL_Rect StretchRect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+
     SDL_Event event;
     int running = 1;
 
@@ -88,29 +90,25 @@ int main(void) {
                 switch (event.key.keysym.sym) {
                     case SDLK_UP:
                         {
-                            GlobalCurrentSurface = GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_UP];
                         } break;
                     case SDLK_DOWN:
                         {
-                            GlobalCurrentSurface = GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_DOWN];
                         } break;
                     case SDLK_LEFT:
                         {
-                            GlobalCurrentSurface = GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_LEFT];
                         } break;
                     case SDLK_RIGHT:
                         {
-                            GlobalCurrentSurface = GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_RIGHT];
                         } break;
                     default:
                         {
-                            GlobalCurrentSurface = GlobalKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT];
+                            running = 0;
                         } break;
                 }
             }
         }
 
-        SDL_BlitSurface(GlobalCurrentSurface, 0, GlobalScreenSurface, 0);
+        SDL_BlitScaled(GlobalStretchedSurface, 0, GlobalScreenSurface, &StretchRect);
         SDL_UpdateWindowSurface(GlobalWindow);
         SDL_Delay(16);
     }
