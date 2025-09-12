@@ -1,5 +1,5 @@
 #include "main.h"
-#include <SDL2/SDL_surface.h>
+#include <SDL2/SDL_image.h>
 
 SDL_Window* GlobalWindow = 0;
 SDL_Surface* GlobalScreenSurface = 0;
@@ -20,6 +20,11 @@ int Init(void) {
         return 1;
     }
 
+    if (!IMG_Init(IMG_INIT_PNG)) {
+        fprintf(stderr, "%s:%d: IMG_Init failed: %s\n", __FILE__, __LINE__, IMG_GetError());
+        return 1;
+    }
+
     GlobalScreenSurface = SDL_GetWindowSurface(GlobalWindow);
     if (!GlobalScreenSurface) {
         fprintf(stderr, "%s:%d: SDL_GetWindowSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
@@ -30,7 +35,7 @@ int Init(void) {
 }
 
 int LoadMedia(void) {
-    GlobalStretchedSurface = LoadSurface("images/stretch.bmp");
+    GlobalStretchedSurface = LoadSurface("images/loaded.png");
     if (!GlobalStretchedSurface) {
         fprintf(stderr, "%s:%d: LoadSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
         return 1;
@@ -41,14 +46,15 @@ int LoadMedia(void) {
 
 void Cleanup(void) {
     SDL_DestroyWindow(GlobalWindow);
+    IMG_Quit();
     SDL_Quit();
 }
 
 /* returns pointer to a loaded surface or 0 on error */
 SDL_Surface* LoadSurface(const char* file) {
-    SDL_Surface* LoadedSurface = SDL_LoadBMP(file);
+    SDL_Surface* LoadedSurface = IMG_Load(file);
     if (!LoadedSurface) {
-        fprintf(stderr, "%s:%d: SDL_LoadBMP failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        fprintf(stderr, "%s:%d: IMG_Load failed: %s\n", __FILE__, __LINE__, IMG_GetError());
         return 0;
     }
 
