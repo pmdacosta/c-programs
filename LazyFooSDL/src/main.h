@@ -7,6 +7,8 @@
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
 
-void cleanup(void);
+int Init(void);
+int LoadMedia(void);
+void Cleanup(void);
 
 #endif

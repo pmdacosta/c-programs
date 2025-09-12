@@ -1,40 +1,26 @@
 #include "main.h"
+#include <SDL2/SDL_surface.h>
 
-SDL_Window* Window = 0;
-SDL_Surface* ScreenSurface = 0;
+SDL_Window* GlobalWindow = 0;
+SDL_Surface* GlobalScreenSurface = 0;
+SDL_Surface* GlobalHelloWorld = 0;
 
 int main(void) {
 
-    if (SDL_Init( SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "%s:%d: SDL_Init failed: %s\n", __FILE__, __LINE__, SDL_GetError());
-        cleanup();
+    if (Init()) {
+        fprintf(stderr, "%s:%d: Init() failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        Cleanup();
         return 1;
     }
 
-    Window = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
-    if (!Window) {
-        fprintf(stderr, "%s:%d: SDL_CreateWindow failed: %s\n", __FILE__, __LINE__, SDL_GetError());
-        cleanup();
+    if (LoadMedia()) {
+        fprintf(stderr, "%s:%d: LoadMedia() failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        Cleanup();
         return 1;
     }
 
-    ScreenSurface = SDL_GetWindowSurface(Window);
-    if (!ScreenSurface) {
-        fprintf(stderr, "%s:%d: SDL_GetWindowSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
-        cleanup();
-        return 1;
-    }
-
-    Uint32 color = SDL_MapRGB(ScreenSurface->format, 0xFF, 0x00, 0x00);
-    printf("%x", color);
-    if (SDL_FillRect(ScreenSurface, NULL, color)) {
-        fprintf(stderr, "%s:%d: SDL_FillRect failed: %s\n", __FILE__, __LINE__, SDL_GetError());
-        cleanup();
-        return 1;
-    }
-
-    SDL_UpdateWindowSurface(Window);
+    SDL_BlitSurface(GlobalHelloWorld, 0, GlobalScreenSurface, 0);
+    SDL_UpdateWindowSurface(GlobalWindow);
 
     SDL_Event event;
     int running = 1;
@@ -47,13 +33,47 @@ int main(void) {
         SDL_Delay(16);
     }
 
-    cleanup();
+    Cleanup();
     return 0;
 }
 
-void cleanup(void) {
-    SDL_FreeSurface(ScreenSurface);
-    SDL_DestroyWindow(Window);
+/* Initliaze game
+ * returns 0 on success or 1 otherwise */
+int Init(void) {
+    if (SDL_Init( SDL_INIT_VIDEO) < 0) {
+        fprintf(stderr, "%s:%d: SDL_Init failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        return 1;
+    }
+
+    GlobalWindow = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+            SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
+    if (!GlobalWindow) {
+        fprintf(stderr, "%s:%d: SDL_CreateWindow failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        return 1;
+    }
+
+    GlobalScreenSurface = SDL_GetWindowSurface(GlobalWindow);
+    if (!GlobalScreenSurface) {
+        fprintf(stderr, "%s:%d: SDL_GetWindowSurface failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        return 1;
+    }
+
+    return 0;
+}
+
+int LoadMedia(void) {
+    GlobalHelloWorld = SDL_LoadBMP("images/hello_world.bmp");
+    if (!GlobalHelloWorld) {
+        fprintf(stderr, "%s:%d: SDL_LoadBMP failed: %s\n", __FILE__, __LINE__, SDL_GetError());
+        return 1;
+    }
+
+    return 0;
+}
+
+void Cleanup(void) {
+    SDL_FreeSurface(GlobalHelloWorld);
+    SDL_DestroyWindow(GlobalWindow);
     SDL_Quit();
 }
 
