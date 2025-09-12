@@ -11,4 +11,8 @@
 ### ncurses
 
 - [TLDP: NCURSES Programming HOWTO](https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/index.html)
-- [terminalroot: ncurses - Guia de Utilização](https://terminalroot.com.br/ncurses/g
+- [terminalroot: ncurses - Guia de Utilização](https://terminalroot.com.br/ncurses/g)
+
+### SDL
+
+- [Beginning Game Programming v2.0](https://lazyfoo.net/tutorials/SDL/index.php#Hello%20SDL)
