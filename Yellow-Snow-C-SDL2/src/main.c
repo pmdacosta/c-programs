@@ -1,8 +1,10 @@
 #include "main.h"
 #include "game.h"
+#include <time.h>
 
 int main(void) {
     struct Game game;
+    srand((unsigned int)time(0));
 
     if (game_new(&game)) {
         fprintf(stderr, "%s:%d: Error initializing game\n", __FILE__, __LINE__);

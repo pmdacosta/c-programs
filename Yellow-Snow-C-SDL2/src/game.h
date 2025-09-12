@@ -8,6 +8,7 @@
 
 struct Flake {
     int type;
+    int speed;
     SDL_Rect rect;
     struct Flake* next;
     SDL_Texture* texture;
@@ -30,6 +31,7 @@ struct Game {
     struct Player player;
     struct Flake* flakes;
     int flake_count;
+    Uint16 ground_height;
 };
 
 int game_new(struct Game* game);

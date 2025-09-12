@@ -1,6 +1,5 @@
 #include "game.h"
 #include "main.h"
-#include <stdlib.h>
 
 int game_new(struct Game* game) {
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -29,6 +28,8 @@ int game_new(struct Game* game) {
                 __FILE__, __LINE__);
         return 1;
     }
+
+    game->ground_height = 514;
 
     // setup player
     game->player.rect.x = (WINDOW_WIDTH - game->player.rect.w) / 2;
@@ -71,7 +72,7 @@ int game_run(struct Game* game) {
 
         player_update(&game->player);
 
-        if (rand() % 200 == 0) {
+        if (rand() % 150 == 0) {
             game->flakes = flake_add(game);
         }
 
@@ -222,6 +223,8 @@ struct Flake* flake_add(struct Game* game) {
         flake->texture = game->yellow_flake;
     }
 
+    flake->speed = 1 + rand() % 2;
+
     return flake;
 }
 
@@ -230,8 +233,17 @@ void flakes_update(struct Game* game) {
     struct Flake *previous_flake = 0;
 
     while (flake) {
-        flake->rect.y++;
-        if (flake->rect.y >= WINDOW_HEIGHT) {
+        flake->rect.y += flake->speed;
+
+        // make the flakes smaller when they hit the ground
+        if (flake->rect.y > game->ground_height - flake->speed * 7) {
+            flake->rect.h -= flake->speed;
+            flake->rect.w -= flake->speed;
+            flake->rect.x += 1;
+        }
+
+        // make the flakes disappear when they hit the ground
+        if (flake->rect.y >= game->ground_height) {
             if (!previous_flake) {
                 // we're at the head
                 game->flakes = flake->next;
@@ -245,8 +257,6 @@ void flakes_update(struct Game* game) {
                 free(flake);
                 flake = previous_flake;
             }
-            game->flake_count--;
-            printf("flake count: %d\n", game->flake_count);
         }
 
         previous_flake = flake;
