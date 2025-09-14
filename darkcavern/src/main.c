@@ -1,92 +1,134 @@
 #include "main.h"
+#include "console.h"
+#include "types.h"
+#include <SDL2/SDL_image.h>
 
-global_variable SDL_Window* GlobalWindow;
-global_variable SDL_Renderer* GlobalRenderer;
-global_variable SDL_Texture* GlobalScreen;
-global_variable u32* GlobalPixels;
-global_variable int GlobalPitch = SCREEN_WIDTH * sizeof(u32);
+global_variable GameRender GlobalGameRender;
+global_variable PT_Console* Console;
 
 void Cleanup(void) {
-    free(GlobalPixels);
-    SDL_DestroyTexture(GlobalScreen);
-    SDL_DestroyRenderer(GlobalRenderer);
-    SDL_DestroyWindow(GlobalWindow);
+    if (Console) {
+        if (Console->Font) {
+            free(Console->Font->Atlas);
+            free(Console->Font);
+        }
+        free(Console->Cells);
+        free(Console->Pixels);
+        free(Console);
+    }
+    free(GlobalGameRender.Pixels);
+    SDL_DestroyTexture(GlobalGameRender.Screen);
+    SDL_DestroyRenderer(GlobalGameRender.Renderer);
+    SDL_DestroyWindow(GlobalGameRender.Window);
+    IMG_Quit();
     SDL_Quit();
 }
 
 void RenderScreen(void) {
-    SDL_UpdateTexture(GlobalScreen, 0, GlobalPixels, GlobalPitch);
-    SDL_RenderClear(GlobalRenderer);
-    SDL_RenderCopy(GlobalRenderer, GlobalScreen, 0, 0);
-    SDL_RenderPresent(GlobalRenderer);
+    SDL_UpdateTexture(GlobalGameRender.Screen, 0, GlobalGameRender.Pixels, GlobalGameRender.Pitch);
+    SDL_RenderClear(GlobalGameRender.Renderer);
+    SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen, 0, 0);
+    SDL_RenderPresent(GlobalGameRender.Renderer);
 }
 
 void DrawPixels(int xOffset, int yOffset) {
-    u8* Row = (u8*) GlobalPixels;
+    u8* Row = (u8*) GlobalGameRender.Pixels;
     for (int y = 0; y < SCREEN_HEIGHT; y++) {
         u32* Pixel = (u32 *) Row;
         for (int x = 0; x < SCREEN_WIDTH; x++) {
             u8 Red = (u8) (x + xOffset);
             u8 Green = (u8) (y + yOffset);
-            *Pixel = (u32) (Red << 24 | Green << 16);
+            *Pixel = (u32) COLOR(Red, Green, 0, 0);
             Pixel++;
         }
-        Row += GlobalPitch;
+        Row += GlobalGameRender.Pitch;
     }
 }
 
-int main(void) {
-
+// Returns 0 on success, 1 otherwise
+int Init(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "%s:%d: SDL_Init failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
         return 1;
     }
     
-    GlobalWindow = SDL_CreateWindow("Dark Carvern",
+    GlobalGameRender.Window = SDL_CreateWindow("Dark Carvern",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-    if (!GlobalWindow) {
+    if (!GlobalGameRender.Window) {
         fprintf(stderr, "%s:%d: SDL_CreateWindow failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
-        Cleanup();
         return 1;
     }
 
-    GlobalRenderer = SDL_CreateRenderer(GlobalWindow,
+    GlobalGameRender.Renderer = SDL_CreateRenderer(GlobalGameRender.Window,
             0, SDL_RENDERER_SOFTWARE);
-    if (!GlobalRenderer) {
+    if (!GlobalGameRender.Renderer) {
         fprintf(stderr, "%s:%d: SDL_CreateRenderer failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
-        Cleanup();
         return 1;
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-    if (SDL_RenderSetLogicalSize(GlobalRenderer, 
+    if (SDL_RenderSetLogicalSize(GlobalGameRender.Renderer, 
                 SCREEN_WIDTH, SCREEN_HEIGHT) < 0) {
         fprintf(stderr, "%s:%d: SDL_RenderSetLogicalSize failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
-        Cleanup();
         return 1;
     }
 
-    GlobalScreen = SDL_CreateTexture(GlobalRenderer, SDL_PIXELFORMAT_RGBA8888, 
+    GlobalGameRender.Screen = SDL_CreateTexture(GlobalGameRender.Renderer, SDL_PIXELFORMAT_RGBA8888, 
             SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
-    if (!GlobalScreen) {
+    if (!GlobalGameRender.Screen) {
         fprintf(stderr, "%s:%d: SDL_CreateTexture failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
-        Cleanup();
         return 1;
     }
 
-    GlobalPixels = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u32));
-    if (!GlobalPixels) {
+    GlobalGameRender.Pixels = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u32));
+    if (!GlobalGameRender.Pixels) {
         fprintf(stderr, "%s:%d: malloc failed: %s\n",
+                __FILE__,__LINE__,SDL_GetError());
+        return 1;
+    }
+
+    GlobalGameRender.Pitch = SCREEN_WIDTH * sizeof(u32);
+
+    if (!IMG_Init(IMG_INIT_PNG)) {
+        fprintf(stderr, "%s:%d: IMG_Init failed: %s\n",
+                __FILE__,__LINE__,IMG_GetError());
+        return 1;
+    }
+
+    Console = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
+            SCREEN_WIDTH / CELL_WIDTH, SCREEN_HEIGHT / CELL_HEIGHT);
+
+    if (!Console) {
+        fprintf(stderr, "%s:%d: PT_ConsoleInit failed",
+                __FILE__,__LINE__);
+        return 1;
+    }
+
+    if (PT_ConsoleSetBitmapFont(Console, "images/terminal16x16.png", ' ',
+                CELL_WIDTH, CELL_HEIGHT)) {
+        fprintf(stderr, "%s:%d: PT_ConsoleSetBitmapFont failed",
+                __FILE__,__LINE__);
+        return 1;
+    }
+
+    return 0;
+}
+
+int main(void) {
+    if (Init()) {
+        fprintf(stderr, "%s:%d: Init failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
         Cleanup();
         return 1;
     }
+
+    // Game Loop
 
     SDL_Event Event;
     int running = 1;

@@ -4,7 +4,7 @@ CFLAGS = -std=c11 -O0 -ggdb3 -Wall -Wextra -Werror -Wpedantic -Wwrite-strings -W
 				  -Wsign-compare -Wundef -Wcast-align -Wstrict-prototypes -Wswitch-default \
 				  -Wold-style-definition -Wmissing-include-dirs \
 				  -fsanitize=address -fsanitize-address-use-after-scope -I src
-LIBS = -lSDL2
+LIBS = -lSDL2 -lSDL2_image
 
 SRC = $(wildcard src/*.c)
 BIN = game
