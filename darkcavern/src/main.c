@@ -4,7 +4,7 @@
 #include <SDL2/SDL_image.h>
 
 global_variable GameRender GlobalGameRender;
-global_variable PT_Console* Console;
+global_variable C_Console* Console;
 
 void Cleanup(void) {
     if (Console) {
@@ -25,6 +25,7 @@ void Cleanup(void) {
 }
 
 void RenderScreen(void) {
+    C_ConsoleClear(Console);
     SDL_UpdateTexture(GlobalGameRender.Screen, 0, GlobalGameRender.Pixels, GlobalGameRender.Pitch);
     SDL_RenderClear(GlobalGameRender.Renderer);
     SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen, 0, 0);
@@ -101,18 +102,18 @@ int Init(void) {
         return 1;
     }
 
-    Console = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
+    Console = C_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
             SCREEN_WIDTH / CELL_WIDTH, SCREEN_HEIGHT / CELL_HEIGHT);
 
     if (!Console) {
-        fprintf(stderr, "%s:%d: PT_ConsoleInit failed",
+        fprintf(stderr, "%s:%d: C_ConsoleInit failed",
                 __FILE__,__LINE__);
         return 1;
     }
 
-    if (PT_ConsoleSetBitmapFont(Console, "images/terminal16x16.png", ' ',
+    if (C_ConsoleSetBitmapFont(Console, "images/terminal16x16.png", ' ',
                 CELL_WIDTH, CELL_HEIGHT)) {
-        fprintf(stderr, "%s:%d: PT_ConsoleSetBitmapFont failed",
+        fprintf(stderr, "%s:%d: C_ConsoleSetBitmapFont failed",
                 __FILE__,__LINE__);
         return 1;
     }
