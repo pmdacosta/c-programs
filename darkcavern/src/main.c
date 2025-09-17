@@ -1,7 +1,9 @@
 #include "main.h"
 #include "console.h"
 #include "types.h"
+#include <SDL2/SDL_events.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_keycode.h>
 
 global_variable GameRender GlobalGameRender;
 global_variable C_Console* Console;
@@ -9,7 +11,7 @@ global_variable C_Console* Console;
 void Cleanup(void) {
     if (Console) {
         if (Console->Font) {
-            free(Console->Font->Atlas);
+            free(Console->Font->Pixels);
             free(Console->Font);
         }
         free(Console->Cells);
@@ -26,7 +28,10 @@ void Cleanup(void) {
 
 void RenderScreen(void) {
     C_ConsoleClear(Console);
-    SDL_UpdateTexture(GlobalGameRender.Screen, 0, GlobalGameRender.Pixels, GlobalGameRender.Pitch);
+    C_ConsolePutCharAt(Console, 'A', 10, 10,
+            COLOR_WHITE);
+    // C_Debug_PrintAtlas(Console);
+    SDL_UpdateTexture(GlobalGameRender.Screen, 0, Console->Pixels, Console->Pitch);
     SDL_RenderClear(GlobalGameRender.Renderer);
     SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen, 0, 0);
     SDL_RenderPresent(GlobalGameRender.Renderer);
@@ -129,23 +134,25 @@ int main(void) {
         return 1;
     }
 
+    printf("DEBUG:%s:%d\n", __FILE__, __LINE__);
+
     // Game Loop
 
     SDL_Event Event;
     int running = 1;
-    int x = 0;
-    int y = 0;
 
     while (running) {
         while (SDL_PollEvent(&Event)) {
             if (Event.type == SDL_QUIT) {
                 running = 0;
+            } else if (Event.type == SDL_KEYDOWN) {
+                if (Event.key.keysym.sym == SDLK_q) {
+                    running = 0;
+                }
             }
         }
 
-        DrawPixels(x, y);
-        y+=2;
-        x++;
+        DrawPixels(0, 0);
         RenderScreen();
         SDL_Delay(16);
     }

@@ -10,15 +10,6 @@
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
 
-// Get individual color values from a 32bit color pixel
-#define RED(c) ((c && 0xFF000000) >> 24)
-#define GREEN(c) ((c && 0x00FF0000) >> 16)
-#define BLUE(c) ((c && 0x0000FF00) >> 8)
-#define ALPHA(c) (c && 0x000000FF)
-
-// Get a color pixel from individual colors
-#define COLOR(r, g, b, a) ((r << 24) | (g << 16) | (b << 8) | a)
-
 typedef struct {
     SDL_Window* Window;
     SDL_Renderer* Renderer;

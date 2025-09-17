@@ -17,8 +17,8 @@
 #define COLOR(r, g, b, a) ((r << 24) | (g << 16) | (b << 8) | a)
 
 // Pallette
-#define COLOR_BLACK COLOR(0xFF, 0xFF, 0xFF, 0xFF)
-#define COLOR_WHITE COLOR(0x00, 0x00, 0x00, 0xFF)
+#define COLOR_BLACK COLOR(0x00, 0x00, 0x00, 0xFF)
+#define COLOR_WHITE COLOR(0xFF, 0xFF, 0xFF, 0xFF)
 
 typedef struct {
     uchar Glyph;
@@ -27,13 +27,22 @@ typedef struct {
 } C_Cell;
 
 typedef struct {
-    u32 *Atlas;
+    u32 *Pixels;
     u32 AtlasWidth;
     u32 AtlasHeight;
     u32 CharWidth;
     u32 CharHeight;
+    u32 Pitch;
     uchar FirstCharInAtlas;
+    u32 TransparentColor;
 } C_Font;
+
+typedef struct {
+    u32 x;
+    u32 y;
+    u32 w;
+    u32 h;
+} C_Rect;
 
 typedef struct {
     u32 *Pixels;      // the screen pixels
@@ -44,6 +53,7 @@ typedef struct {
     u32 Cols;
     u32 CellWidth;
     u32 CellHeight;
+    C_Rect Rect;
     C_Font *Font;
     C_Cell *Cells;
 } C_Console;
@@ -58,20 +68,21 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
 
 void C_ConsoleClear(C_Console *Console);
 
-void C_Fill(u32 *Pixels, u32 PixelsPerRow, SDL_Rect *DestRect, u32 Color);
-
 int C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
-                    i32 CellX, i32 CellY,
-                    u32 FGColor, u32 BGColor);
+                    u32 CellX, u32 CellY,
+                    u32 FGColor);
 
-void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, SDL_Rect *DestRect, u32 SourceColor);
+void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
 
-int C_CopyBlend(u32 *DestPixels, SDL_Rect *DestRect, u32 DestPitch,
-             u32 *SrcPixels, SDL_Rect *SrcRect, u32 SrcPitch,
-             u32 NewColor);
+void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
 
-SDL_Rect C_RectForGlyph(uchar Glyph, C_Font *Font);
+int C_CopyBlend(u32 *DestPixels, C_Rect *DestRect, u32 DestPitch,
+             u32 *SrcPixels, C_Rect *SrcRect, u32 SrcPitch,
+             u32 TransparentColor, u32 NewColor);
 
-inline u32 C_ColorizePixel(u32 dest, u32 src); 
+C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font);
 
+u32 C_ColorizePixel(u32 TransparentColor, u32 AtlasColor, u32 NewColor); 
+
+void C_Debug_PrintAtlas(C_Console* Console);
 #endif

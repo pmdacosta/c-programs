@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO: change order of functions to match header file
+
 // Returns pointer to a C_Console on success
 // or 0 (NULL) on error
 C_Console* C_ConsoleInit(u32 Width, u32 Height, 
@@ -23,7 +25,7 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
     
     C_Console *Console = malloc(sizeof(C_Console));
 
-    Console->Pixels = calloc(Width * Height, sizeof(u32));
+    Console->Pixels = calloc((u32) Width * Height, sizeof(u32));
     Console->Pitch = Width * sizeof(u32);
     Console->Width = Width;
     Console->Height = Height;
@@ -33,6 +35,8 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
     Console->CellHeight = Height / Rows;
     Console->Font = NULL;
     Console->Cells = calloc(Rows * Cols, sizeof(C_Cell));
+    C_Rect Rect = {0, 0, Width, Height};
+    Console->Rect = Rect;
 
     return Console;
 }
@@ -65,13 +69,13 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
 
     // Copy the image data so we can hold onto it
     u32 ImgSize = (u32) (ConvertedFontImage->h * ConvertedFontImage->w) * sizeof(u32);
-    Font->Atlas = malloc(ImgSize);
-    if (!Font->Atlas) {
+    Font->Pixels = malloc(ImgSize);
+    if (!Font->Pixels) {
         fprintf(stderr,"%s:%d: malloc failed\n",
                 __FILE__, __LINE__);
         return 1;
     }
-    memcpy(Font->Atlas, ConvertedFontImage->pixels, ImgSize);
+    memcpy(Font->Pixels, ConvertedFontImage->pixels, ImgSize);
 
     // Create and configure the font
     Font->CharWidth = CharWidth;
@@ -79,11 +83,13 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
     Font->AtlasWidth = (u32) ConvertedFontImage->w;
     Font->AtlasHeight = (u32) ConvertedFontImage->h;
     Font->FirstCharInAtlas = FirstCharInAtlas;    
+    Font->Pitch = Font->AtlasWidth * sizeof(u32);
+    Font->TransparentColor = COLOR_BLACK;
 
     SDL_FreeSurface(ConvertedFontImage);
 
     if (Console->Font != NULL) {
-        free(Console->Font->Atlas);
+        free(Console->Font->Pixels);
         free(Console->Font);
     }
 
@@ -92,21 +98,19 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
 }
 
 void C_ConsoleClear(C_Console *Console) {
-    SDL_Rect Rect = {0, 0, Console->Width, Console->Height};
-    C_Fill(Console->Pixels, Console->Width, &Rect, 0x000000ff);
+    C_FillRect(Console->Pixels, Console->Pitch, &Console->Rect, 0x000000FF);
 }
 
-void C_FillRect(u32* Pixels, u32 Pitch, SDL_Rect *DestRect, u32 SourceColor)
+void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)
 {
     u32 rightX = DestRect->x + DestRect->w;
     u32 bottomY = DestRect->y + DestRect->h;
 
     u8* Row = (u8*) Pixels;
     Row += Pitch * DestRect->y;
-    for (int y = DestRect->y; y < bottomY; y++) {
+    for (u32 y = DestRect->y; y < bottomY; y++) {
         u32* Pixel = (u32 *) (Row + DestRect->x * sizeof(u32));
-        Pixel += y;
-        for (int x = DestRect ->x; x < rightX; x++) {
+        for (u32 x = DestRect ->x; x < rightX; x++) {
             *Pixel = SourceColor;
             Pixel++;
         }
@@ -115,22 +119,22 @@ void C_FillRect(u32* Pixels, u32 Pitch, SDL_Rect *DestRect, u32 SourceColor)
 }
 
 int C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
-                    i32 CellX, i32 CellY,
-                    u32 FGColor, u32 BGColor) {
+        u32 CellX, u32 CellY,
+        u32 FGColor) {
 
     u32 x = CellX * Console->CellWidth;
     u32 y = CellY * Console->CellHeight;
-    SDL_Rect DestRect = {x, y, Console->CellWidth, Console->CellHeight};
+    C_Rect DestRect = {x, y, Console->CellWidth, Console->CellHeight};
 
     // Fill the background with alpha blending
     // C_FillRectWithAlphaBlend(Console->Pixels, Console->Pitch, &DestRect, BGColor);
-    C_FillRect(Console->Pixels, Console->Pitch, &DestRect, BGColor);
+    // C_FillRect(Console->Pixels, Console->Pitch, &DestRect, BGColor);
 
     // Copy the glyph with alpha blending and desired coloring
-    SDL_Rect SrcRect = C_RectForGlyph(Glyph, Console->Font);
-    int Result = C_CopyBlend(Console->Pixels, &DestRect, Console->Width, 
-                 Console->Font->Atlas, &SrcRect, Console->Font->AtlasWidth,
-                 FGColor);
+    C_Rect SrcRect = C_RectForGlyph(Glyph, Console->Font);
+    int Result = C_CopyBlend(Console->Pixels, &DestRect, Console->Pitch, 
+            Console->Font->Pixels, &SrcRect, Console->Font->Pitch,
+            Console->Font->TransparentColor, FGColor);
     if (Result) {
         fprintf(stderr, "%s:%d: C_CopyBlend failed\n", __FILE__, __LINE__);
         return 1;
@@ -142,7 +146,7 @@ int C_ConsolePutCharAt(C_Console *Console, uchar Glyph,
 // For each pixel in the destination rect, alpha blend the 
 // background color to the existing color.
 // ref: https://en.wikipedia.org/wiki/Alpha_compositing
-void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, SDL_Rect *DestRect, u32 SourceColor)
+void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)
 {
     u8 SourceAlphaByte = ALPHA(SourceColor);
     if (SourceAlphaByte == 0) return; // Source color is fully transparent -> nothing to do
@@ -150,7 +154,7 @@ void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, SDL_Rect *DestRect, u32 So
         // Source color is fully opaque, no need to blend
         C_FillRect(Pixels, Pitch, DestRect, SourceColor);
     }
- 
+
     u32 RightX = DestRect->x + DestRect->w;
     u32 BottomY = DestRect->y + DestRect->h;
 
@@ -191,10 +195,27 @@ void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, SDL_Rect *DestRect, u32 So
     }
 }
 
+void C_Debug_PrintAtlas(C_Console* Console) {
+
+    u8* ConsoleRow = (u8*) Console->Pixels;
+    u8* AtlasRow = (u8*) Console->Font->Pixels;
+    for (u32 Y = 0; Y < Console->Font->AtlasHeight; Y++) {
+        u32* ConsolePixel = (u32*) ConsoleRow;
+        u32* AtlasPixel = (u32*) AtlasRow;
+        for (u32 X = 0; X < Console->Font->AtlasWidth; X++) {
+            *ConsolePixel = *AtlasPixel;
+            ConsolePixel++;
+            AtlasPixel++;
+        }
+        ConsoleRow += Console->Pitch;
+        AtlasRow += Console->Font->Pitch;
+    }
+}
+
 // returns 0 success, 1 otherwise
-int C_CopyBlend(u32 *DestPixels, SDL_Rect *DestRect, u32 DestPitch,
-        u32 *SrcPixels, SDL_Rect *SrcRect, u32 SrcPitch,
-        u32 NewColor)
+int C_CopyBlend(u32 *DestPixels, C_Rect *DestRect, u32 DestPitch,
+        u32 *SrcPixels, C_Rect *SrcRect, u32 SrcPitch,
+        u32 TransparentColor, u32 NewColor)
 {
     // Src and Dest rect need to have the same dimensions
     if (DestRect->w != SrcRect->w || DestRect->h != SrcRect->h) {
@@ -227,18 +248,16 @@ int C_CopyBlend(u32 *DestPixels, SDL_Rect *DestRect, u32 DestPitch,
                 DestX++, SrcX++,
                 SrcPixel++, DestPixel++) {
 
-            u32 SrcColor = *SrcPixel;
+            if (*SrcPixel == TransparentColor) continue; // The atlas pixel is the transparent color
+                                                         // so we don't copy anything
 
-            // Colorize our source pixel before we blend it
-            u32 TintedSrc = C_ColorizePixel(SrcColor, NewColor);
-
-            u32 SrcAlphaByte = ALPHA(TintedSrc);
+            u32 SrcAlphaByte = ALPHA(NewColor);
 
             if (SrcAlphaByte == 0) continue; // Source is transparent - so do nothing
 
             if (SrcAlphaByte == 255) {
                 // Src is fully opaque, just overwrite
-                *DestPixel = TintedSrc;
+                *DestPixel = NewColor;
                 continue;
             }
 
@@ -247,9 +266,9 @@ int C_CopyBlend(u32 *DestPixels, SDL_Rect *DestRect, u32 DestPitch,
             float InvSrcA = (1.0f - SrcA);
 
             // Premultiply the source color
-            float PremultSrcR = RED(TintedSrc)   * SrcA;
-            float PremultSrcG = GREEN(TintedSrc) * SrcA;
-            float PremultSrcB = BLUE(TintedSrc)  * SrcA;
+            float PremultSrcR = RED(NewColor)   * SrcA;
+            float PremultSrcG = GREEN(NewColor) * SrcA;
+            float PremultSrcB = BLUE(NewColor)  * SrcA;
 
             // Premultiply the destination color
             u32 Existing = *DestPixel;
@@ -272,34 +291,30 @@ int C_CopyBlend(u32 *DestPixels, SDL_Rect *DestRect, u32 DestPitch,
 
             *DestPixel = COLOR(FinalR, FinalG, FinalB, FinalA);
         }
+
+        SrcRow += SrcPitch;
+        DestRow += DestPitch;
     }
 
     return 0;
 }
 
-SDL_Rect C_RectForGlyph(uchar Glyph, C_Font *Font) {
+C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font) {
     u32 Index = Glyph - Font->FirstCharInAtlas;
     u32 CharsPerRow = (Font->AtlasWidth / Font->CharWidth);
     u32 xOffset = (Index % CharsPerRow) * Font->CharWidth;
     u32 yOffset = (Index / CharsPerRow) * Font->CharHeight;
 
-    SDL_Rect glyphRect = {xOffset, yOffset, Font->CharWidth, Font->CharHeight};
+    C_Rect glyphRect = {xOffset, yOffset, Font->CharWidth, Font->CharHeight};
     return glyphRect;
 }
 
 
 // Colorize a pixel without blending the colors, only the alpha channel
-u32 C_ColorizePixel(u32 Dest, u32 Src) 
+u32 C_ColorizePixel(u32 TransparentColor, u32 AtlasColor, u32 NewColor) 
 {
-    // Colorize the Destination pixel using the source color
-    u8 DestA = ALPHA(Dest);
-    if (DestA == 255 || DestA == 0) {
-        // If the destination is fully opaque, or fully transparent
-        // Just overwrite with the Src
-        return Src;
+    if (AtlasColor == TransparentColor) {
+        return AtlasColor;
     }
-        // Scale the final alpha based on both Dest & Src alphas
-    u8 OutA = (u8)(ALPHA(Src) * (DestA / 255.0));
-    u32 OutRGBA = (Src & 0xFFFFFF00) | OutA; 
-    return OutRGBA;
+    return NewColor;
 }
