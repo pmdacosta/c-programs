@@ -17,8 +17,13 @@
 #define COLOR(r, g, b, a) ((r << 24) | (g << 16) | (b << 8) | a)
 
 // Pallette
-#define COLOR_BLACK COLOR(0x00, 0x00, 0x00, 0xFF)
-#define COLOR_WHITE COLOR(0xFF, 0xFF, 0xFF, 0xFF)
+#define COLOR_BLACK  COLOR(0x00, 0x00, 0x00, 0xFF)
+#define COLOR_WHITE  COLOR(0xFF, 0xFF, 0xFF, 0xFF)
+#define COLOR_RED    COLOR(0xFF, 0x00, 0x00, 0xFF)
+#define COLOR_GREEN  COLOR(0x00, 0xFF, 0x00, 0xFF)
+#define COLOR_BLUE   COLOR(0x00, 0x00, 0xFF, 0xFF)
+#define COLOR_YELLOW COLOR(0xFF, 0xFF, 0x00, 0xFF)
+#define COLOR_PURPLE COLOR(0x80, 0x00, 0x80, 0xFF)
 
 typedef struct {
     uchar Glyph;
@@ -63,7 +68,6 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
                            u32 Cols, u32 Rows);
 
 int C_ConsoleSetBitmapFont(C_Console *Console, const char *File, 
-                        uchar FirstCharInAtlas,
                         u32 CharWidth, u32 CharHeight);
 
 void C_ConsoleClear(C_Console *Console);

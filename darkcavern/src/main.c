@@ -28,7 +28,7 @@ void Cleanup(void) {
 
 void RenderScreen(void) {
     C_ConsoleClear(Console);
-    C_ConsolePutCharAt(Console, 'A', 10, 10,
+    C_ConsolePutCharAt(Console, '@', 10, 10,
             COLOR_WHITE);
     // C_Debug_PrintAtlas(Console);
     SDL_UpdateTexture(GlobalGameRender.Screen, 0, Console->Pixels, Console->Pitch);
@@ -116,7 +116,7 @@ int Init(void) {
         return 1;
     }
 
-    if (C_ConsoleSetBitmapFont(Console, "images/terminal16x16.png", ' ',
+    if (C_ConsoleSetBitmapFont(Console, "images/terminal16x16.png",
                 CELL_WIDTH, CELL_HEIGHT)) {
         fprintf(stderr, "%s:%d: C_ConsoleSetBitmapFont failed",
                 __FILE__,__LINE__);

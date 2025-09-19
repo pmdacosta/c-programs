@@ -44,7 +44,6 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
 
 // returns 0 on success or 1 otherwise
 int C_ConsoleSetBitmapFont(C_Console *Console, const char *File, 
-                        uchar FirstCharInAtlas,
                         u32 CharWidth, u32 CharHeight) {
 
     // Load the image data
@@ -82,7 +81,7 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
     Font->CharHeight = CharHeight;
     Font->AtlasWidth = (u32) ConvertedFontImage->w;
     Font->AtlasHeight = (u32) ConvertedFontImage->h;
-    Font->FirstCharInAtlas = FirstCharInAtlas;    
+    Font->FirstCharInAtlas = 0;
     Font->Pitch = Font->AtlasWidth * sizeof(u32);
     Font->TransparentColor = COLOR_BLACK;
 
