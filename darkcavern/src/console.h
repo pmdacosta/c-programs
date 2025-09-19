@@ -72,21 +72,16 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
 
 void C_ConsoleClear(C_Console *Console);
 
-int C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
+void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
                     u32 CellX, u32 CellY,
                     u32 FGColor);
 
 void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
 
-void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
-
-int C_CopyBlend(u32 *DestPixels, C_Rect *DestRect, u32 DestPitch,
-             u32 *SrcPixels, C_Rect *SrcRect, u32 SrcPitch,
-             u32 TransparentColor, u32 NewColor);
-
 C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font);
 
-u32 C_ColorizePixel(u32 TransparentColor, u32 AtlasColor, u32 NewColor); 
-
 void C_Debug_PrintAtlas(C_Console* Console);
+
+void C_Debug_DrawGradient(C_Console* Console, int xOffset, int yOffset);
+
 #endif

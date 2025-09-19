@@ -1,9 +1,6 @@
 #include "main.h"
 #include "console.h"
 #include "types.h"
-#include <SDL2/SDL_events.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_keycode.h>
 
 global_variable GameRender GlobalGameRender;
 global_variable C_Console* Console;
@@ -18,37 +15,11 @@ void Cleanup(void) {
         free(Console->Pixels);
         free(Console);
     }
-    free(GlobalGameRender.Pixels);
     SDL_DestroyTexture(GlobalGameRender.Screen);
     SDL_DestroyRenderer(GlobalGameRender.Renderer);
     SDL_DestroyWindow(GlobalGameRender.Window);
     IMG_Quit();
     SDL_Quit();
-}
-
-void RenderScreen(void) {
-    C_ConsoleClear(Console);
-    C_ConsolePutCharAt(Console, '@', 10, 10,
-            COLOR_WHITE);
-    // C_Debug_PrintAtlas(Console);
-    SDL_UpdateTexture(GlobalGameRender.Screen, 0, Console->Pixels, Console->Pitch);
-    SDL_RenderClear(GlobalGameRender.Renderer);
-    SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen, 0, 0);
-    SDL_RenderPresent(GlobalGameRender.Renderer);
-}
-
-void DrawPixels(int xOffset, int yOffset) {
-    u8* Row = (u8*) GlobalGameRender.Pixels;
-    for (int y = 0; y < SCREEN_HEIGHT; y++) {
-        u32* Pixel = (u32 *) Row;
-        for (int x = 0; x < SCREEN_WIDTH; x++) {
-            u8 Red = (u8) (x + xOffset);
-            u8 Green = (u8) (y + yOffset);
-            *Pixel = (u32) COLOR(Red, Green, 0, 0);
-            Pixel++;
-        }
-        Row += GlobalGameRender.Pitch;
-    }
 }
 
 // Returns 0 on success, 1 otherwise
@@ -88,13 +59,6 @@ int Init(void) {
             SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
     if (!GlobalGameRender.Screen) {
         fprintf(stderr, "%s:%d: SDL_CreateTexture failed: %s\n",
-                __FILE__,__LINE__,SDL_GetError());
-        return 1;
-    }
-
-    GlobalGameRender.Pixels = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u32));
-    if (!GlobalGameRender.Pixels) {
-        fprintf(stderr, "%s:%d: malloc failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
         return 1;
     }
@@ -140,6 +104,7 @@ int main(void) {
 
     SDL_Event Event;
     int running = 1;
+    int x = 0;
 
     while (running) {
         while (SDL_PollEvent(&Event)) {
@@ -152,8 +117,15 @@ int main(void) {
             }
         }
 
-        DrawPixels(0, 0);
-        RenderScreen();
+        C_ConsoleClear(Console);
+        C_ConsolePutCharAt(Console, '@', (x++ / 10) % Console->Cols, 10, COLOR_RED);
+        SDL_UpdateTexture(GlobalGameRender.Screen, 0,
+                Console->Pixels, Console->Pitch);
+        SDL_RenderClear(GlobalGameRender.Renderer);
+        SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen,
+                0, 0);
+        SDL_RenderPresent(GlobalGameRender.Renderer);
+
         SDL_Delay(16);
     }
 

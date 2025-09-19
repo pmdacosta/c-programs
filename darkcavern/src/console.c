@@ -117,80 +117,43 @@ void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)
     }
 }
 
-int C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
+void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
         u32 CellX, u32 CellY,
         u32 FGColor) {
 
     u32 x = CellX * Console->CellWidth;
     u32 y = CellY * Console->CellHeight;
-    C_Rect DestRect = {x, y, Console->CellWidth, Console->CellHeight};
+    C_Rect ConsoleRect = {x, y, Console->CellWidth, Console->CellHeight};
 
-    // Fill the background with alpha blending
-    // C_FillRectWithAlphaBlend(Console->Pixels, Console->Pitch, &DestRect, BGColor);
-    // C_FillRect(Console->Pixels, Console->Pitch, &DestRect, BGColor);
+    C_Rect AtlasRect = C_RectForGlyph(Glyph, Console->Font);
 
-    // Copy the glyph with alpha blending and desired coloring
-    C_Rect SrcRect = C_RectForGlyph(Glyph, Console->Font);
-    int Result = C_CopyBlend(Console->Pixels, &DestRect, Console->Pitch, 
-            Console->Font->Pixels, &SrcRect, Console->Font->Pitch,
-            Console->Font->TransparentColor, FGColor);
-    if (Result) {
-        fprintf(stderr, "%s:%d: C_CopyBlend failed\n", __FILE__, __LINE__);
-        return 1;
-    }
+    u32 ConsoleRightX = ConsoleRect.x + ConsoleRect.w;
+    u32 ConsoleBottomY = ConsoleRect.y + ConsoleRect.h;
 
-    return 0;
-}
+    u8* AtlasRow = (u8*) Console->Font->Pixels;
+    u8* ConsoleRow = (u8*) Console->Pixels;
+    AtlasRow += Console->Font->Pitch * AtlasRect.y;
+    ConsoleRow += Console->Pitch * ConsoleRect.y;
 
-// For each pixel in the destination rect, alpha blend the 
-// background color to the existing color.
-// ref: https://en.wikipedia.org/wiki/Alpha_compositing
-void C_FillRectWithAlphaBlend(u32 *Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)
-{
-    u8 SourceAlphaByte = ALPHA(SourceColor);
-    if (SourceAlphaByte == 0) return; // Source color is fully transparent -> nothing to do
-    if (SourceAlphaByte == 255) {
-        // Source color is fully opaque, no need to blend
-        C_FillRect(Pixels, Pitch, DestRect, SourceColor);
-    }
+    for (u32 ConsoleY = ConsoleRect.y, AtlasY = AtlasRect.y; 
+            ConsoleY < ConsoleBottomY; 
+            ConsoleY++, AtlasY++) {
 
-    u32 RightX = DestRect->x + DestRect->w;
-    u32 BottomY = DestRect->y + DestRect->h;
+        u32 *AtlasPixel = (u32*) (AtlasRow + AtlasRect.x * sizeof(u32));
+        u32 *ConsolePixel = (u32*) (ConsoleRow + ConsoleRect.x * sizeof(u32));
 
-    // Precompute source color channels and alpha terms
-    float SourceAlpha = SourceAlphaByte / 255.0f;
-    float InvSourceAlpha = 1.0f - SourceAlpha;
-    u8 SourceR = RED(SourceColor);
-    u8 SourceG = GREEN(SourceColor);
-    u8 SourceB = BLUE(SourceColor);
+        for (u32 ConsoleX = ConsoleRect.x, AtlasX = AtlasRect.x; 
+                ConsoleX < ConsoleRightX; 
+                ConsoleX++, AtlasX++,
+                AtlasPixel++, ConsolePixel++) {
 
-    u8* Row = (u8*) Pixels;
-    Row += Pitch * DestRect->y;
-
-    for (u32 y = DestRect->y; y < BottomY; y++) {
-
-        u32 *Pixel = (u32*) (Row + DestRect->x * sizeof(u32));
-
-        for (u32 x = DestRect->x; x < RightX; x++) {
-            // Do alpha blending
-            u32 DestColor = *Pixel;
-
-            float DestAlpha = ALPHA(DestColor) / 255.0f;
-            float DestR = RED(DestColor)   * DestAlpha;
-            float DestG = GREEN(DestColor) * DestAlpha;
-            float DestB = BLUE(DestColor)  * DestAlpha;
-
-            u8 OutR = (u8) (SourceR + DestR * InvSourceAlpha);
-            u8 OutG = (u8) (SourceG + DestG * InvSourceAlpha);
-            u8 OutB = (u8) (SourceB + DestB * InvSourceAlpha);
-            u8 OutA = (u8) ((SourceAlpha + DestAlpha * InvSourceAlpha) * 255);
-
-            *Pixel = COLOR(OutR, OutG, OutB, OutA);
-
-            Pixel++;
+            if (*AtlasPixel != Console->Font->TransparentColor) {
+                *ConsolePixel = FGColor;
+            }
         }
 
-        Row += Pitch;
+        AtlasRow += Console->Font->Pitch;
+        ConsoleRow += Console->Pitch;
     }
 }
 
@@ -211,93 +174,6 @@ void C_Debug_PrintAtlas(C_Console* Console) {
     }
 }
 
-// returns 0 success, 1 otherwise
-int C_CopyBlend(u32 *DestPixels, C_Rect *DestRect, u32 DestPitch,
-        u32 *SrcPixels, C_Rect *SrcRect, u32 SrcPitch,
-        u32 TransparentColor, u32 NewColor)
-{
-    // Src and Dest rect need to have the same dimensions
-    if (DestRect->w != SrcRect->w || DestRect->h != SrcRect->h) {
-        fprintf(stderr, "%s:%d: SrcRect and DestRect do not dimentions do not match\n",
-                __FILE__, __LINE__);
-        return 1;
-    }
-
-    // For each pixel in the destination rect, alpha blend to it the 
-    // corresponding pixel in the source rect.
-    // ref: https://en.wikipedia.org/wiki/Alpha_compositing
-
-    u32 DestRightX = DestRect->x + DestRect->w;
-    u32 DestBottomY = DestRect->y + DestRect->h;
-
-    u8* SrcRow = (u8*) SrcPixels;
-    u8* DestRow = (u8*) DestPixels;
-    SrcRow += SrcPitch * SrcRect->y;
-    DestRow += DestPitch * DestRect->y;
-
-    for (u32 DestY = DestRect->y, SrcY = SrcRect->y; 
-            DestY < DestBottomY; 
-            DestY++, SrcY++) {
-
-        u32 *SrcPixel = (u32*) (SrcRow + SrcRect->x * sizeof(u32));
-        u32 *DestPixel = (u32*) (DestRow + DestRect->x * sizeof(u32));
-
-        for (u32 DestX = DestRect->x, SrcX = SrcRect->x; 
-                DestX < DestRightX; 
-                DestX++, SrcX++,
-                SrcPixel++, DestPixel++) {
-
-            if (*SrcPixel == TransparentColor) continue; // The atlas pixel is the transparent color
-                                                         // so we don't copy anything
-
-            u32 SrcAlphaByte = ALPHA(NewColor);
-
-            if (SrcAlphaByte == 0) continue; // Source is transparent - so do nothing
-
-            if (SrcAlphaByte == 255) {
-                // Src is fully opaque, just overwrite
-                *DestPixel = NewColor;
-                continue;
-            }
-
-            // Alpha Blending
-            float SrcA = SrcAlphaByte / 255.0f;
-            float InvSrcA = (1.0f - SrcA);
-
-            // Premultiply the source color
-            float PremultSrcR = RED(NewColor)   * SrcA;
-            float PremultSrcG = GREEN(NewColor) * SrcA;
-            float PremultSrcB = BLUE(NewColor)  * SrcA;
-
-            // Premultiply the destination color
-            u32 Existing = *DestPixel;
-            float DestA = ALPHA(Existing) / 255.0f;
-            float DestR = RED(Existing)   * DestA;
-            float DestG = GREEN(Existing) * DestA;
-            float DestB = BLUE(Existing)  * DestA;
-
-            // Compute final blended colors
-            float OutA = SrcA + DestA * InvSrcA;
-            float OutR = PremultSrcR + DestR * InvSrcA;
-            float OutG = PremultSrcG + DestG * InvSrcA;
-            float OutB = PremultSrcB + DestB * InvSrcA;
-
-            // Unpremultiply
-            u8 FinalA = (u8) (OutA * 255);
-            u8 FinalR = (u8) (OutR / OutA);
-            u8 FinalG = (u8) (OutG / OutA);
-            u8 FinalB = (u8) (OutB / OutA);
-
-            *DestPixel = COLOR(FinalR, FinalG, FinalB, FinalA);
-        }
-
-        SrcRow += SrcPitch;
-        DestRow += DestPitch;
-    }
-
-    return 0;
-}
-
 C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font) {
     u32 Index = Glyph - Font->FirstCharInAtlas;
     u32 CharsPerRow = (Font->AtlasWidth / Font->CharWidth);
@@ -308,12 +184,16 @@ C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font) {
     return glyphRect;
 }
 
-
-// Colorize a pixel without blending the colors, only the alpha channel
-u32 C_ColorizePixel(u32 TransparentColor, u32 AtlasColor, u32 NewColor) 
-{
-    if (AtlasColor == TransparentColor) {
-        return AtlasColor;
+void C_Debug_DrawGradient(C_Console* Console, int xOffset, int yOffset) {
+    u8* Row = (u8*) Console->Pixels;
+    for (u32 y = 0; y < Console->Height; y++) {
+        u32* Pixel = (u32 *) Row;
+        for (u32 x = 0; x < Console->Width; x++) {
+            u8 Red = (u8) (x + xOffset);
+            u8 Green = (u8) (y + yOffset);
+            *Pixel = (u32) COLOR(Red, Green, 0, 0);
+            Pixel++;
+        }
+        Row += Console->Pitch;
     }
-    return NewColor;
 }

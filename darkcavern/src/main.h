@@ -14,7 +14,6 @@ typedef struct {
     SDL_Window* Window;
     SDL_Renderer* Renderer;
     SDL_Texture* Screen;
-    u32* Pixels;
     int Pitch;
 } GameRender;
 
@@ -22,6 +21,5 @@ typedef struct {
 void Cleanup(void);
 int Init(void);
 void RenderScreen(void);
-void DrawPixels(int xOffset, int yOffset);
 
 #endif
