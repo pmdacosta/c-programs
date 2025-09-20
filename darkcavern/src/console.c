@@ -6,17 +6,18 @@
 
 // Returns pointer to a C_Console on success
 // or 0 (NULL) on error
-C_Console* C_ConsoleInit(u32 Width, u32 Height, 
-                           u32 Cols, u32 Rows) {
+C_Console* C_ConsoleInit(void) {
+    u32 Cols = SCREEN_WIDTH / CELL_WIDTH; 
+    u32 Rows = SCREEN_HEIGHT / CELL_HEIGHT;
     // Width must be a multiple of Cols
-    if (Width % Cols != 0) {
+    if (SCREEN_WIDTH % Cols != 0) {
         fprintf(stderr,"%s:%d: Error in C_ConsoleInit: Width must be a multiple of Cols\n",
                 __FILE__, __LINE__);
         return 0;
     }
 
     // Height must be a multiple of Rows
-    if (Height % Rows != 0) {
+    if (SCREEN_HEIGHT % Rows != 0) {
         fprintf(stderr,"%s:%d: Error in C_ConsoleInit: Height must be a multiple of Rows\n",
                 __FILE__, __LINE__);
         return 0;
@@ -24,23 +25,17 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
     
     C_Console *Console = malloc(sizeof(C_Console));
 
-    Console->Pixels = calloc((u32) Width * Height, sizeof(u32));
+    Console->Pixels = calloc((u32) SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(u32));
     if (!Console->Pixels) {
         fprintf(stderr,"%s:%d: calloc failed\n",
                 __FILE__, __LINE__);
         return 0;
     }
-    Console->Pitch = Width * sizeof(u32);
+    Console->Pitch = SCREEN_WIDTH * sizeof(u32);
     Console->Rows = Rows;
     Console->Cols = Cols;
     Console->Font = NULL;
-    Console->Cells = calloc(Rows * Cols, sizeof(C_Cell));
-    if (!Console->Cells) {
-        fprintf(stderr,"%s:%d: calloc failed\n",
-                __FILE__, __LINE__);
-        return 0;
-    }
-    C_Rect Rect = {0, 0, Width, Height};
+    C_Rect Rect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
     Console->Rect = Rect;
 
     Console->Player = malloc(sizeof(C_Player));
@@ -56,6 +51,17 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
     return Console;
 }
 
+void C_ConsoleFree(C_Console* Console) {
+    if (Console) {
+        if (Console->Font) {
+            free(Console->Font->Pixels);
+            free(Console->Font);
+        }
+        free(Console->Pixels);
+        free(Console->Player);
+        free(Console);
+    }
+}
 
 // returns 0 on success or 1 otherwise
 int C_ConsoleSetBitmapFont(C_Console *Console, const char *File) {

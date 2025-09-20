@@ -37,12 +37,6 @@ int dark_init(void);
 #define TRANSPARENT_PIXEL COLOR_BLACK
 
 typedef struct {
-    u32 FGColor;
-    u32 BGColor;
-    uchar Glyph;
-} C_Cell;
-
-typedef struct {
     u32 *Pixels;
     u32 BitmapWidth;
     u32 BitmapHeight;
@@ -74,12 +68,12 @@ typedef struct {
     u32 Cols;
     C_Rect Rect;
     C_Font* Font;
-    C_Cell* Cells;
     C_Player* Player;
 } C_Console;
 
-C_Console* C_ConsoleInit(u32 Width, u32 Height, 
-                           u32 Cols, u32 Rows);
+C_Console* C_ConsoleInit(void);
+
+void C_ConsoleFree(C_Console* Console);
 
 int C_ConsoleSetBitmapFont(C_Console *Console, const char *File);
 

@@ -12,16 +12,7 @@ global_variable GameRender GlobalGameRender;
 global_variable C_Console* Console;
 
 void dark_cleanup(void) {
-    if (Console) {
-        if (Console->Font) {
-            free(Console->Font->Pixels);
-            free(Console->Font);
-        }
-        free(Console->Cells);
-        free(Console->Pixels);
-        free(Console->Player);
-        free(Console);
-    }
+    C_ConsoleFree(Console);
     SDL_DestroyTexture(GlobalGameRender.Screen);
     SDL_DestroyRenderer(GlobalGameRender.Renderer);
     SDL_DestroyWindow(GlobalGameRender.Window);
@@ -70,9 +61,7 @@ int dark_init(void) {
         return 1;
     }
 
-    Console = C_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT,
-            SCREEN_WIDTH / CELL_WIDTH, SCREEN_HEIGHT / CELL_HEIGHT);
-
+    Console = C_ConsoleInit();
     if (!Console) {
         fprintf(stderr, "%s:%d: C_ConsoleInit failed",
                 __FILE__,__LINE__);
