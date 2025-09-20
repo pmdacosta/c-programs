@@ -26,6 +26,11 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
     C_Console *Console = malloc(sizeof(C_Console));
 
     Console->Pixels = calloc((u32) Width * Height, sizeof(u32));
+    if (!Console->Pixels) {
+        fprintf(stderr,"%s:%d: calloc failed\n",
+                __FILE__, __LINE__);
+        return 0;
+    }
     Console->Pitch = Width * sizeof(u32);
     Console->Width = Width;
     Console->Height = Height;
@@ -35,8 +40,23 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
     Console->CellHeight = Height / Rows;
     Console->Font = NULL;
     Console->Cells = calloc(Rows * Cols, sizeof(C_Cell));
+    if (!Console->Cells) {
+        fprintf(stderr,"%s:%d: calloc failed\n",
+                __FILE__, __LINE__);
+        return 0;
+    }
     C_Rect Rect = {0, 0, Width, Height};
     Console->Rect = Rect;
+
+    Console->Player = malloc(sizeof(C_Player));
+    if (!Console->Player) {
+        fprintf(stderr,"%s:%d: malloc failed\n",
+                __FILE__, __LINE__);
+        return 0;
+    }
+    Console->Player->Glyph = '@';
+    Console->Player->Position.x = 10;
+    Console->Player->Position.y = 10;
 
     return Console;
 }
@@ -97,7 +117,7 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
 }
 
 void C_ConsoleClear(C_Console *Console) {
-    C_FillRect(Console->Pixels, Console->Pitch, &Console->Rect, 0x000000FF);
+    C_FillRect(Console->Pixels, Console->Pitch, &Console->Rect, COLOR_BLACK);
 }
 
 void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)

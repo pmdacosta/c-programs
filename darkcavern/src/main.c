@@ -13,6 +13,7 @@ void Cleanup(void) {
         }
         free(Console->Cells);
         free(Console->Pixels);
+        free(Console->Player);
         free(Console);
     }
     SDL_DestroyTexture(GlobalGameRender.Screen);
@@ -98,27 +99,40 @@ int main(void) {
         return 1;
     }
 
-    printf("DEBUG:%s:%d\n", __FILE__, __LINE__);
-
     // Game Loop
-
     SDL_Event Event;
     int running = 1;
-    int x = 0;
+    C_Player* Player = Console->Player;
 
     while (running) {
         while (SDL_PollEvent(&Event)) {
             if (Event.type == SDL_QUIT) {
                 running = 0;
             } else if (Event.type == SDL_KEYDOWN) {
-                if (Event.key.keysym.sym == SDLK_q) {
+                switch(Event.key.keysym.sym) {
+                case SDLK_q:
                     running = 0;
+                    break;
+                case SDLK_w:
+                    if (Player->Position.y > 0) Player->Position.y--;
+                    break;
+                case SDLK_s:
+                    if (Player->Position.y + 1 < Console->Rows) Player->Position.y++;
+                    break;
+                case SDLK_a:
+                    if (Player->Position.x > 0) Player->Position.x--;
+                    break;
+                case SDLK_d:
+                    if (Player->Position.x + 1 < Console->Cols) Player->Position.x++;
+                    break;
+                default: break;
                 }
             }
         }
 
         C_ConsoleClear(Console);
-        C_ConsolePutCharAt(Console, '@', (x++ / 10) % Console->Cols, 10, COLOR_RED);
+        C_ConsolePutCharAt(Console, Player->Glyph, 
+                Player->Position.x, Player->Position.y, COLOR_RED);
         SDL_UpdateTexture(GlobalGameRender.Screen, 0,
                 Console->Pixels, Console->Pitch);
         SDL_RenderClear(GlobalGameRender.Renderer);

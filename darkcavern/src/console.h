@@ -50,6 +50,16 @@ typedef struct {
 } C_Rect;
 
 typedef struct {
+    u32 x;
+    u32 y;
+} C_Position;
+
+typedef struct {
+    uchar Glyph;
+    C_Position Position;
+} C_Player;
+
+typedef struct {
     u32 *Pixels;      // the screen pixels
     u32 Pitch;
     u32 Width;
@@ -59,10 +69,10 @@ typedef struct {
     u32 CellWidth;
     u32 CellHeight;
     C_Rect Rect;
-    C_Font *Font;
-    C_Cell *Cells;
+    C_Font* Font;
+    C_Cell* Cells;
+    C_Player* Player;
 } C_Console;
-
 
 C_Console* C_ConsoleInit(u32 Width, u32 Height, 
                            u32 Cols, u32 Rows);
