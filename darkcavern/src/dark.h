@@ -70,12 +70,8 @@ typedef struct {
 typedef struct {
     u32 *Pixels;      // the screen pixels
     u32 Pitch;
-    u32 Width;
-    u32 Height;
     u32 Rows;
     u32 Cols;
-    u32 CellWidth;
-    u32 CellHeight;
     C_Rect Rect;
     C_Font* Font;
     C_Cell* Cells;

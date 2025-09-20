@@ -31,12 +31,8 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
         return 0;
     }
     Console->Pitch = Width * sizeof(u32);
-    Console->Width = Width;
-    Console->Height = Height;
     Console->Rows = Rows;
     Console->Cols = Cols;
-    Console->CellWidth = Width / Cols;
-    Console->CellHeight = Height / Rows;
     Console->Font = NULL;
     Console->Cells = calloc(Rows * Cols, sizeof(C_Cell));
     if (!Console->Cells) {
@@ -135,9 +131,9 @@ void C_ConsolePutCharAt(C_Console *Console, uchar Glyph,
         u32 CellX, u32 CellY,
         u32 FGColor) {
 
-    u32 x = CellX * Console->CellWidth;
-    u32 y = CellY * Console->CellHeight;
-    C_Rect ConsoleRect = {x, y, Console->CellWidth, Console->CellHeight};
+    u32 x = CellX * CELL_WIDTH;
+    u32 y = CellY * CELL_HEIGHT;
+    C_Rect ConsoleRect = {x, y, CELL_WIDTH, CELL_HEIGHT};
 
     C_Rect AtlasRect = C_FontGetGlyphRect(Console->Font, Glyph);
 
@@ -200,9 +196,9 @@ C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph) {
 
 void C_Debug_DrawGradient(C_Console* Console, int xOffset, int yOffset) {
     u8* Row = (u8*) Console->Pixels;
-    for (u32 y = 0; y < Console->Height; y++) {
+    for (u32 y = 0; y < SCREEN_HEIGHT; y++) {
         u32* Pixel = (u32 *) Row;
-        for (u32 x = 0; x < Console->Width; x++) {
+        for (u32 x = 0; x < SCREEN_WIDTH; x++) {
             u8 Red = (u8) (x + xOffset);
             u8 Green = (u8) (y + yOffset);
             *Pixel = (u32) COLOR(Red, Green, 0, 0);

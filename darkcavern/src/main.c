@@ -32,8 +32,7 @@ void dark_cleanup(void) {
 // Returns 0 on success, 1 otherwise
 int dark_init(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "%s:%d: SDL_Init failed: %s\n",
-                __FILE__,__LINE__,SDL_GetError());
+        fprintf(stderr, "%s:%d: SDL_Init failed: %s\n",__FILE__,__LINE__,SDL_GetError());
         return 1;
     }
     
@@ -41,44 +40,37 @@ int dark_init(void) {
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     if (!GlobalGameRender.Window) {
-        fprintf(stderr, "%s:%d: SDL_CreateWindow failed: %s\n",
-                __FILE__,__LINE__,SDL_GetError());
+        fprintf(stderr, "%s:%d: SDL_CreateWindow failed: %s\n",__FILE__,__LINE__,SDL_GetError());
         return 1;
     }
 
-    GlobalGameRender.Renderer = SDL_CreateRenderer(GlobalGameRender.Window,
-            0, SDL_RENDERER_SOFTWARE);
+    GlobalGameRender.Renderer = SDL_CreateRenderer(GlobalGameRender.Window, 0, SDL_RENDERER_SOFTWARE);
     if (!GlobalGameRender.Renderer) {
-        fprintf(stderr, "%s:%d: SDL_CreateRenderer failed: %s\n",
-                __FILE__,__LINE__,SDL_GetError());
+        fprintf(stderr, "%s:%d: SDL_CreateRenderer failed: %s\n",__FILE__,__LINE__,SDL_GetError());
         return 1;
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-    if (SDL_RenderSetLogicalSize(GlobalGameRender.Renderer, 
-                SCREEN_WIDTH, SCREEN_HEIGHT) < 0) {
-        fprintf(stderr, "%s:%d: SDL_RenderSetLogicalSize failed: %s\n",
-                __FILE__,__LINE__,SDL_GetError());
+    if (SDL_RenderSetLogicalSize(GlobalGameRender.Renderer, SCREEN_WIDTH, SCREEN_HEIGHT) < 0) {
+        fprintf(stderr, "%s:%d: SDL_RenderSetLogicalSize failed: %s\n",__FILE__,__LINE__,SDL_GetError());
         return 1;
     }
 
     GlobalGameRender.Screen = SDL_CreateTexture(GlobalGameRender.Renderer, SDL_PIXELFORMAT_RGBA8888, 
             SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
     if (!GlobalGameRender.Screen) {
-        fprintf(stderr, "%s:%d: SDL_CreateTexture failed: %s\n",
-                __FILE__,__LINE__,SDL_GetError());
+        fprintf(stderr, "%s:%d: SDL_CreateTexture failed: %s\n",__FILE__,__LINE__,SDL_GetError());
         return 1;
     }
 
     GlobalGameRender.Pitch = SCREEN_WIDTH * sizeof(u32);
 
     if (!IMG_Init(IMG_INIT_PNG)) {
-        fprintf(stderr, "%s:%d: IMG_Init failed: %s\n",
-                __FILE__,__LINE__,IMG_GetError());
+        fprintf(stderr, "%s:%d: IMG_Init failed: %s\n",__FILE__,__LINE__,IMG_GetError());
         return 1;
     }
 
-    Console = C_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
+    Console = C_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT,
             SCREEN_WIDTH / CELL_WIDTH, SCREEN_HEIGHT / CELL_HEIGHT);
 
     if (!Console) {
