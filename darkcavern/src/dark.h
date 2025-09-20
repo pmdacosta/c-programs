@@ -1,9 +1,24 @@
-#ifndef CONSOLE
-#define CONSOLE
-
+/* dark.h */
+#ifndef DARK_H
+#define DARK_H
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include "types.h"
+#include <stdint.h>
+
+// HELPER TYPES
+#define internal static
+#define global_variable static
+
+typedef unsigned int uint;
+typedef unsigned char uchar;
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef int8_t i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
 
 // COLOR HELPERS
 // Get individual color values from a 32bit color pixel
@@ -29,6 +44,7 @@
 #define SCREEN_HEIGHT 720
 
 void dark_cleanup(void);
+void dark_exit(int status);
 int dark_init(void);
 
 // ---------- console.c ----------

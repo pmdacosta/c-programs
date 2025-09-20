@@ -1,5 +1,5 @@
 #include "dark.h"
-#include "types.h"
+#include "console.c"
 
 typedef struct {
     SDL_Window* Window;
@@ -18,6 +18,11 @@ void dark_cleanup(void) {
     SDL_DestroyWindow(GlobalGameRender.Window);
     IMG_Quit();
     SDL_Quit();
+}
+
+void dark_exit(int status) {
+    dark_cleanup();
+    exit(status);
 }
 
 // Returns 0 on success, 1 otherwise
@@ -81,8 +86,7 @@ int main(void) {
     if (dark_init()) {
         fprintf(stderr, "%s:%d: Init failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
-        dark_cleanup();
-        return 1;
+        dark_exit(1);
     }
 
     // Game Loop
@@ -91,30 +95,42 @@ int main(void) {
     C_Player* Player = Console->Player;
 
     while (running) {
+
         while (SDL_PollEvent(&Event)) {
+
             if (Event.type == SDL_QUIT) {
-                running = 0;
-            } else if (Event.type == SDL_KEYDOWN) {
-                switch(Event.key.keysym.sym) {
-                case SDLK_q:
-                    running = 0;
-                    break;
-                case SDLK_w:
-                    if (Player->Position.y > 0) Player->Position.y--;
-                    break;
-                case SDLK_s:
-                    if (Player->Position.y + 1 < Console->Rows) Player->Position.y++;
-                    break;
-                case SDLK_a:
-                    if (Player->Position.x > 0) Player->Position.x--;
-                    break;
-                case SDLK_d:
-                    if (Player->Position.x + 1 < Console->Cols) Player->Position.x++;
-                    break;
-                default: break;
-                }
+                dark_exit(0);
             }
-        }
+
+            if (Event.type == SDL_KEYDOWN) {
+
+                switch(Event.key.keysym.sym) {
+
+                    case SDLK_q:
+                        dark_cleanup();
+                        return 0;
+
+                    case SDLK_UP:
+                        if (Player->Position.y > 0) Player->Position.y--;
+                        break;
+
+                    case SDLK_DOWN:
+                        if (Player->Position.y + 1 < Console->Rows) Player->Position.y++;
+                        break;
+
+                    case SDLK_LEFT:
+                        if (Player->Position.x > 0) Player->Position.x--;
+                        break;
+
+                    case SDLK_RIGHT:
+                        if (Player->Position.x + 1 < Console->Cols) Player->Position.x++;
+                        break;
+
+                    default: break;
+                }
+
+            }
+        } 
 
         C_ConsoleClear(Console);
         C_ConsolePutCharAt(Console, Player->Glyph, 
