@@ -1,11 +1,17 @@
-#include "main.h"
-#include "console.h"
+#include "dark.h"
 #include "types.h"
+
+typedef struct {
+    SDL_Window* Window;
+    SDL_Renderer* Renderer;
+    SDL_Texture* Screen;
+    int Pitch;
+} GameRender;
 
 global_variable GameRender GlobalGameRender;
 global_variable C_Console* Console;
 
-void Cleanup(void) {
+void dark_cleanup(void) {
     if (Console) {
         if (Console->Font) {
             free(Console->Font->Pixels);
@@ -24,7 +30,7 @@ void Cleanup(void) {
 }
 
 // Returns 0 on success, 1 otherwise
-int Init(void) {
+int dark_init(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "%s:%d: SDL_Init failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
@@ -92,10 +98,10 @@ int Init(void) {
 }
 
 int main(void) {
-    if (Init()) {
+    if (dark_init()) {
         fprintf(stderr, "%s:%d: Init failed: %s\n",
                 __FILE__,__LINE__,SDL_GetError());
-        Cleanup();
+        dark_cleanup();
         return 1;
     }
 
@@ -143,6 +149,6 @@ int main(void) {
         SDL_Delay(16);
     }
 
-    Cleanup();
+    dark_cleanup();
     return 0;
 }

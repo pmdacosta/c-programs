@@ -2,11 +2,10 @@
 #define CONSOLE
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include "types.h"
 
-#define CELL_WIDTH 16
-#define CELL_HEIGHT 16
-
+// COLOR HELPERS
 // Get individual color values from a 32bit color pixel
 #define RED(c) ((c & 0xFF000000) >> 24)
 #define GREEN(c) ((c & 0x00FF0000) >> 16)
@@ -24,6 +23,17 @@
 #define COLOR_BLUE   COLOR(0x00, 0x00, 0xFF, 0xFF)
 #define COLOR_YELLOW COLOR(0xFF, 0xFF, 0x00, 0xFF)
 #define COLOR_PURPLE COLOR(0x80, 0x00, 0x80, 0xFF)
+
+// ---------- main.c ----------
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 720
+
+void dark_cleanup(void);
+int dark_init(void);
+
+// ---------- console.c ----------
+#define CELL_WIDTH 16
+#define CELL_HEIGHT 16
 
 typedef struct {
     uchar Glyph;

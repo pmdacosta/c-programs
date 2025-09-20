@@ -1,5 +1,4 @@
-#include "console.h"
-#include <SDL2/SDL_image.h>
+#include "dark.h"
 #include <stdio.h>
 #include <stdlib.h>
 
