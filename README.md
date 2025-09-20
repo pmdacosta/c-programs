@@ -16,3 +16,8 @@
 ### SDL
 
 - [Beginning Game Programming v2.0](https://lazyfoo.net/tutorials/SDL/index.php#Hello%20SDL)
+
+### Project Ideas
+
+- [Austin Morlan's Pong Clone](https://austinmorlan.com/posts/pong_clone/)
+    - It's in C++ but I'll recode it in C
