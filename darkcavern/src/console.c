@@ -62,9 +62,7 @@ C_Console* C_ConsoleInit(u32 Width, u32 Height,
 
 
 // returns 0 on success or 1 otherwise
-int C_ConsoleSetBitmapFont(C_Console *Console, const char *File, 
-                        u32 CharWidth, u32 CharHeight) {
-
+int C_ConsoleSetBitmapFont(C_Console *Console, const char *File) {
     // Load the image data
     SDL_Surface* FontImage = IMG_Load(File);
     if (!FontImage) {
@@ -96,13 +94,10 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
     memcpy(Font->Pixels, ConvertedFontImage->pixels, ImgSize);
 
     // Create and configure the font
-    Font->CharWidth = CharWidth;
-    Font->CharHeight = CharHeight;
-    Font->AtlasWidth = (u32) ConvertedFontImage->w;
-    Font->AtlasHeight = (u32) ConvertedFontImage->h;
-    Font->FirstCharInAtlas = 0;
-    Font->Pitch = Font->AtlasWidth * sizeof(u32);
-    Font->TransparentColor = COLOR_BLACK;
+    Font->BitmapWidth = (u32) ConvertedFontImage->w;
+    Font->BitmapHeight = (u32) ConvertedFontImage->h;
+    Font->FirstCharInBitmap = 0;
+    Font->Pitch = Font->BitmapWidth * sizeof(u32);
 
     SDL_FreeSurface(ConvertedFontImage);
 
@@ -116,10 +111,10 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File,
 }
 
 void C_ConsoleClear(C_Console *Console) {
-    C_FillRect(Console->Pixels, Console->Pitch, &Console->Rect, COLOR_BLACK);
+    C_ConsoleFillRect(Console->Pixels, Console->Pitch, &Console->Rect, COLOR_BLACK);
 }
 
-void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)
+void C_ConsoleFillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor)
 {
     u32 rightX = DestRect->x + DestRect->w;
     u32 bottomY = DestRect->y + DestRect->h;
@@ -144,7 +139,7 @@ void C_ConsolePutCharAt(C_Console *Console, uchar Glyph,
     u32 y = CellY * Console->CellHeight;
     C_Rect ConsoleRect = {x, y, Console->CellWidth, Console->CellHeight};
 
-    C_Rect AtlasRect = C_RectForGlyph(Glyph, Console->Font);
+    C_Rect AtlasRect = C_FontGetGlyphRect(Console->Font, Glyph);
 
     u32 ConsoleRightX = ConsoleRect.x + ConsoleRect.w;
     u32 ConsoleBottomY = ConsoleRect.y + ConsoleRect.h;
@@ -166,7 +161,7 @@ void C_ConsolePutCharAt(C_Console *Console, uchar Glyph,
                 ConsoleX++, AtlasX++,
                 AtlasPixel++, ConsolePixel++) {
 
-            if (*AtlasPixel != Console->Font->TransparentColor) {
+            if (*AtlasPixel != TRANSPARENT_PIXEL) {
                 *ConsolePixel = FGColor;
             }
         }
@@ -180,10 +175,10 @@ void C_Debug_PrintAtlas(C_Console* Console) {
 
     u8* ConsoleRow = (u8*) Console->Pixels;
     u8* AtlasRow = (u8*) Console->Font->Pixels;
-    for (u32 Y = 0; Y < Console->Font->AtlasHeight; Y++) {
+    for (u32 Y = 0; Y < Console->Font->BitmapHeight; Y++) {
         u32* ConsolePixel = (u32*) ConsoleRow;
         u32* AtlasPixel = (u32*) AtlasRow;
-        for (u32 X = 0; X < Console->Font->AtlasWidth; X++) {
+        for (u32 X = 0; X < Console->Font->BitmapWidth; X++) {
             *ConsolePixel = *AtlasPixel;
             ConsolePixel++;
             AtlasPixel++;
@@ -193,13 +188,13 @@ void C_Debug_PrintAtlas(C_Console* Console) {
     }
 }
 
-C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font) {
-    u32 Index = Glyph - Font->FirstCharInAtlas;
-    u32 CharsPerRow = (Font->AtlasWidth / Font->CharWidth);
-    u32 xOffset = (Index % CharsPerRow) * Font->CharWidth;
-    u32 yOffset = (Index / CharsPerRow) * Font->CharHeight;
+C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph) {
+    u32 Index = Glyph - Font->FirstCharInBitmap;
+    u32 CharsPerRow = (Font->BitmapWidth / CELL_WIDTH);
+    u32 xOffset = (Index % CharsPerRow) * CELL_WIDTH;
+    u32 yOffset = (Index / CharsPerRow) * CELL_HEIGHT;
 
-    C_Rect glyphRect = {xOffset, yOffset, Font->CharWidth, Font->CharHeight};
+    C_Rect glyphRect = {xOffset, yOffset, CELL_WIDTH, CELL_HEIGHT};
     return glyphRect;
 }
 

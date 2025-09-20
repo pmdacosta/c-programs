@@ -87,8 +87,7 @@ int dark_init(void) {
         return 1;
     }
 
-    if (C_ConsoleSetBitmapFont(Console, "images/terminal16x16.png",
-                CELL_WIDTH, CELL_HEIGHT)) {
+    if (C_ConsoleSetBitmapFont(Console, "images/terminal16x16.png")) {
         fprintf(stderr, "%s:%d: C_ConsoleSetBitmapFont failed",
                 __FILE__,__LINE__);
         return 1;

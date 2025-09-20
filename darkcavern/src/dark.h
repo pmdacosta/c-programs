@@ -34,22 +34,20 @@ int dark_init(void);
 // ---------- console.c ----------
 #define CELL_WIDTH 16
 #define CELL_HEIGHT 16
+#define TRANSPARENT_PIXEL COLOR_BLACK
 
 typedef struct {
-    uchar Glyph;
     u32 FGColor;
     u32 BGColor;
+    uchar Glyph;
 } C_Cell;
 
 typedef struct {
     u32 *Pixels;
-    u32 AtlasWidth;
-    u32 AtlasHeight;
-    u32 CharWidth;
-    u32 CharHeight;
+    u32 BitmapWidth;
+    u32 BitmapHeight;
     u32 Pitch;
-    uchar FirstCharInAtlas;
-    u32 TransparentColor;
+    uchar FirstCharInBitmap;
 } C_Font;
 
 typedef struct {
@@ -65,8 +63,8 @@ typedef struct {
 } C_Position;
 
 typedef struct {
-    uchar Glyph;
     C_Position Position;
+    uchar Glyph;
 } C_Player;
 
 typedef struct {
@@ -87,8 +85,7 @@ typedef struct {
 C_Console* C_ConsoleInit(u32 Width, u32 Height, 
                            u32 Cols, u32 Rows);
 
-int C_ConsoleSetBitmapFont(C_Console *Console, const char *File, 
-                        u32 CharWidth, u32 CharHeight);
+int C_ConsoleSetBitmapFont(C_Console *Console, const char *File);
 
 void C_ConsoleClear(C_Console *Console);
 
@@ -96,9 +93,9 @@ void C_ConsolePutCharAt(C_Console *Console, uchar Glyph,
                     u32 CellX, u32 CellY,
                     u32 FGColor);
 
-void C_FillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
+void C_ConsoleFillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
 
-C_Rect C_RectForGlyph(uchar Glyph, C_Font *Font);
+C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph);
 
 void C_Debug_PrintAtlas(C_Console* Console);
 
