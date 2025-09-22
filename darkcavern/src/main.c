@@ -1,6 +1,8 @@
 /* main.c */
 #include "dark.h"
 #include "console.c"
+#include <stdlib.h>
+#include <time.h>
 
 typedef struct {
     SDL_Window* Window;
@@ -85,7 +87,7 @@ int dark_init(void) {
 
 // == ECS ===============================
 
-global_variable ECS_Entity GlobalEntityArray[ECS_MAX_ENTITIES];
+global_variable ECS_Entity GlobalEntityArray[ECS_ENTITIES_MAX];
 global_variable u32 GlobalEntityIDAvailable = 0;
 global_variable u32 GlobalEntityCount = 0;
 
@@ -100,9 +102,9 @@ uchar ECS_EntityGetGlyph(ECS_EntityType Type) {
     }
 }
 
-// returns EntityID or -1 if no slots available
-int ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color) {
-    if (GlobalEntityCount == ECS_MAX_ENTITIES) return -1;
+// returns EntityID or ECS_ENTITIES_MAX if no slots available
+u32 ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color) {
+    if (GlobalEntityCount == ECS_ENTITIES_MAX) return ECS_ENTITIES_MAX;
 
     int EntityID = GlobalEntityIDAvailable;
     GlobalEntityArray[EntityID].Active = 1;
@@ -113,9 +115,9 @@ int ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color) {
     GlobalEntityCount++;
 
     // Set new AvailableEntityID
-    if (GlobalEntityCount < ECS_MAX_ENTITIES) {
+    if (GlobalEntityCount < ECS_ENTITIES_MAX) {
         while (GlobalEntityArray[GlobalEntityIDAvailable].Active) {
-            GlobalEntityIDAvailable = (GlobalEntityIDAvailable + 1) % ECS_MAX_ENTITIES;
+            GlobalEntityIDAvailable = (GlobalEntityIDAvailable + 1) % ECS_ENTITIES_MAX;
         }
     }
 
@@ -128,13 +130,14 @@ void ECS_DisableEntity(int EntityID) {
 }
 
 void ECS_Init(void) {
-    for (int i = 0; i < ECS_MAX_ENTITIES; i++) {
+    for (int i = 0; i < ECS_ENTITIES_MAX; i++) {
         GlobalEntityArray[i].Active = 0;
     }
 }
 
 void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange) {
     ECS_Entity Entity = GlobalEntityArray[EntityID];
+    printf("DEBUG %d: ROWCHANGE: %d COLCHANGE: %d\n",__LINE__, RowChange, ColChange);
 
     if (Entity.Row == 0 && RowChange < 0) return; 
     if (Entity.Col == 0 && ColChange < 0) return; 
@@ -156,6 +159,7 @@ void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange) {
 
     GlobalEntityArray[EntityID].Row = Row;
     GlobalEntityArray[EntityID].Col = Col;
+    printf("DEBUG %d: ROW: %d COL: %d\n",__LINE__, GlobalEntityArray[EntityID].Row  ,GlobalEntityArray[EntityID].Col );
 }
 
 // ======================================
@@ -168,11 +172,14 @@ int main(void) {
         dark_exit(1);
     }
 
-    // Game Loop
+    srand(time(0));
+
     SDL_Event Event;
     int running = 1;
-    int PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, 25, 25,  COLOR_GREEN);
-    int WallID = ECS_EntityAdd(ECS_ENTITY_WALL, 30, 30,  COLOR_RED);
+    u32 PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, 25, 25,  COLOR_GREEN);
+    for (int i = 0; i < 40; i++) {
+        ECS_EntityAdd(ECS_ENTITY_WALL, rand() % GlobalConsole->Rows, rand() % GlobalConsole->Cols,  COLOR_RED);
+    }
 
     while (running) {
 
@@ -212,12 +219,15 @@ int main(void) {
             }
         } 
 
-        ECS_Entity Player = GlobalEntityArray[PlayerID];
-        ECS_Entity Wall = GlobalEntityArray[WallID];
-
         C_ConsoleClear(GlobalConsole);
-        C_ConsolePutCharAt(GlobalConsole, ECS_EntityGetGlyph(Player.Type), Player.Col, Player.Row, Player.Color);
-        C_ConsolePutCharAt(GlobalConsole, ECS_EntityGetGlyph(Wall.Type), Wall.Col, Wall.Row, Wall.Color);
+
+        // Draw Entities
+        ECS_Entity* Entity;
+        for (u32 EntityID = 0; EntityID < GlobalEntityCount; EntityID++) {
+            Entity = &GlobalEntityArray[EntityID];
+            C_ConsolePutCharAt(GlobalConsole, ECS_EntityGetGlyph(Entity->Type), Entity->Row, Entity->Col, Entity->Color);
+        }
+
         SDL_UpdateTexture(GlobalGameRender.Screen, 0, GlobalConsole->Pixels, GlobalConsole->Pitch);
         SDL_RenderClear(GlobalGameRender.Renderer);
         SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen,

@@ -137,8 +137,8 @@ void C_ConsolePutCharAt(C_Console *Console, uchar Glyph,
         u32 Row, u32 Col,
         u32 FGColor) {
 
-    u32 x = Row * CELL_WIDTH;
-    u32 y = Col * CELL_HEIGHT;
+    u32 x = Col * CELL_HEIGHT;
+    u32 y = Row * CELL_WIDTH;
     C_Rect ConsoleRect = {x, y, CELL_WIDTH, CELL_HEIGHT};
 
     C_Rect AtlasRect = C_FontGetGlyphRect(Console->Font, Glyph);

@@ -4,6 +4,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
 
 // HELPER TYPES
 #define internal static
@@ -109,7 +111,7 @@ void C_Debug_DrawGradient(C_Console* Console, int xOffset, int yOffset);
 
 // == ECS ===============================
 
-#define ECS_MAX_ENTITIES 16
+#define ECS_ENTITIES_MAX 16
 
 typedef enum {
     ECS_ENTITY_PLAYER,
@@ -126,7 +128,7 @@ typedef struct {
 } ECS_Entity;
 
 uchar ECS_EntityGetGlyph(ECS_EntityType Type);
-int ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color);
+u32 ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color);
 void ECS_DisableEntity(int EntityID);
 void ECS_Init(void);
 void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange);
