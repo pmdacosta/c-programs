@@ -96,7 +96,7 @@ int C_ConsoleSetBitmapFont(C_Console *Console, const char *File);
 void C_ConsoleClear(C_Console *Console);
 
 void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
-                    u32 CellX, u32 CellY,
+                    u32 Row, u32 Col,
                     u32 FGColor);
 
 void C_ConsoleFillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
@@ -106,5 +106,31 @@ C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph);
 void C_Debug_PrintAtlas(C_Console* Console);
 
 void C_Debug_DrawGradient(C_Console* Console, int xOffset, int yOffset);
+
+// == ECS ===============================
+
+#define ECS_MAX_ENTITIES 16
+
+typedef enum {
+    ECS_ENTITY_PLAYER,
+    ECS_ENTITY_WALL,
+    ECS_ENTITY_TOTAL
+} ECS_EntityType;
+
+typedef struct {
+    ECS_EntityType Type; // NOTE: put Type at different place to improve struct memory layout?
+    u32 Row;
+    u32 Col;
+    u32 Color;
+    u8 Active;
+} ECS_Entity;
+
+uchar ECS_EntityGetGlyph(ECS_EntityType Type);
+int ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color);
+void ECS_DisableEntity(int EntityID);
+void ECS_Init(void);
+void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange);
+
+// ======================================
 
 #endif

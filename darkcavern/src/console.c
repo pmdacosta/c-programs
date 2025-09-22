@@ -134,11 +134,11 @@ void C_ConsoleFillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor
 }
 
 void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
-        u32 CellX, u32 CellY,
+        u32 Row, u32 Col,
         u32 FGColor) {
 
-    u32 x = CellX * CELL_WIDTH;
-    u32 y = CellY * CELL_HEIGHT;
+    u32 x = Row * CELL_WIDTH;
+    u32 y = Col * CELL_HEIGHT;
     C_Rect ConsoleRect = {x, y, CELL_WIDTH, CELL_HEIGHT};
 
     C_Rect AtlasRect = C_FontGetGlyphRect(Console->Font, Glyph);

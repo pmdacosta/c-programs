@@ -1,3 +1,4 @@
+/* main.c */
 #include "dark.h"
 #include "console.c"
 
@@ -9,10 +10,10 @@ typedef struct {
 } GameRender;
 
 global_variable GameRender GlobalGameRender;
-global_variable C_Console* Console;
+global_variable C_Console* GlobalConsole;
 
 void dark_cleanup(void) {
-    C_ConsoleFree(Console);
+    C_ConsoleFree(GlobalConsole);
     SDL_DestroyTexture(GlobalGameRender.Screen);
     SDL_DestroyRenderer(GlobalGameRender.Renderer);
     SDL_DestroyWindow(GlobalGameRender.Window);
@@ -66,14 +67,14 @@ int dark_init(void) {
         return 1;
     }
 
-    Console = C_ConsoleInit();
-    if (!Console) {
+    GlobalConsole = C_ConsoleInit();
+    if (!GlobalConsole) {
         fprintf(stderr, "%s:%d: C_ConsoleInit failed",
                 __FILE__,__LINE__);
         return 1;
     }
 
-    if (C_ConsoleSetBitmapFont(Console, "images/terminal16x16.png")) {
+    if (C_ConsoleSetBitmapFont(GlobalConsole, "images/terminal16x16.png")) {
         fprintf(stderr, "%s:%d: C_ConsoleSetBitmapFont failed",
                 __FILE__,__LINE__);
         return 1;
@@ -81,6 +82,84 @@ int dark_init(void) {
 
     return 0;
 }
+
+// == ECS ===============================
+
+global_variable ECS_Entity GlobalEntityArray[ECS_MAX_ENTITIES];
+global_variable u32 GlobalEntityIDAvailable = 0;
+global_variable u32 GlobalEntityCount = 0;
+
+uchar ECS_EntityGetGlyph(ECS_EntityType Type) {
+    switch(Type) {
+        case ECS_ENTITY_PLAYER:
+            return '@';
+        case ECS_ENTITY_WALL:
+            return '#';
+        default:
+            return 0;
+    }
+}
+
+// returns EntityID or -1 if no slots available
+int ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color) {
+    if (GlobalEntityCount == ECS_MAX_ENTITIES) return -1;
+
+    int EntityID = GlobalEntityIDAvailable;
+    GlobalEntityArray[EntityID].Active = 1;
+    GlobalEntityArray[EntityID].Type = Type;
+    GlobalEntityArray[EntityID].Row = Row;
+    GlobalEntityArray[EntityID].Col = Col;
+    GlobalEntityArray[EntityID].Color = Color;
+    GlobalEntityCount++;
+
+    // Set new AvailableEntityID
+    if (GlobalEntityCount < ECS_MAX_ENTITIES) {
+        while (GlobalEntityArray[GlobalEntityIDAvailable].Active) {
+            GlobalEntityIDAvailable = (GlobalEntityIDAvailable + 1) % ECS_MAX_ENTITIES;
+        }
+    }
+
+    return EntityID;
+}
+void ECS_DisableEntity(int EntityID) {
+    GlobalEntityArray[EntityID].Active = 0;
+    GlobalEntityIDAvailable = EntityID;
+    GlobalEntityCount--;
+}
+
+void ECS_Init(void) {
+    for (int i = 0; i < ECS_MAX_ENTITIES; i++) {
+        GlobalEntityArray[i].Active = 0;
+    }
+}
+
+void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange) {
+    ECS_Entity Entity = GlobalEntityArray[EntityID];
+
+    if (Entity.Row == 0 && RowChange < 0) return; 
+    if (Entity.Col == 0 && ColChange < 0) return; 
+
+    u32 Row = Entity.Row + RowChange;
+    u32 Col = Entity.Col + ColChange;
+
+    if (Row >= GlobalConsole->Rows || Col >= GlobalConsole->Cols) return;
+
+    for (u32 SearchEntityID = 0; SearchEntityID < GlobalEntityCount; SearchEntityID++) {
+        if (SearchEntityID == EntityID) continue;
+        ECS_Entity* SearchEntity = &GlobalEntityArray[SearchEntityID];
+        if (!SearchEntity->Active) continue;
+        if (SearchEntity->Row == Row && SearchEntity->Col == Col) {
+            if (SearchEntity->Type == ECS_ENTITY_WALL) return;
+            break;
+        }
+    }
+
+    GlobalEntityArray[EntityID].Row = Row;
+    GlobalEntityArray[EntityID].Col = Col;
+}
+
+// ======================================
+
 
 int main(void) {
     if (dark_init()) {
@@ -92,7 +171,8 @@ int main(void) {
     // Game Loop
     SDL_Event Event;
     int running = 1;
-    C_Player* Player = Console->Player;
+    int PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, 25, 25,  COLOR_GREEN);
+    int WallID = ECS_EntityAdd(ECS_ENTITY_WALL, 30, 30,  COLOR_RED);
 
     while (running) {
 
@@ -106,24 +186,24 @@ int main(void) {
 
                 switch(Event.key.keysym.sym) {
 
-                    case SDLK_q:
+                    case SDLK_ESCAPE:
                         dark_cleanup();
                         return 0;
 
                     case SDLK_UP:
-                        if (Player->Position.y > 0) Player->Position.y--;
+                        ECS_EntityMoveBy(PlayerID, -1, 0);
                         break;
 
                     case SDLK_DOWN:
-                        if (Player->Position.y + 1 < Console->Rows) Player->Position.y++;
+                        ECS_EntityMoveBy(PlayerID, 1, 0);
                         break;
 
                     case SDLK_LEFT:
-                        if (Player->Position.x > 0) Player->Position.x--;
+                        ECS_EntityMoveBy(PlayerID, 0, -1);
                         break;
 
                     case SDLK_RIGHT:
-                        if (Player->Position.x + 1 < Console->Cols) Player->Position.x++;
+                        ECS_EntityMoveBy(PlayerID, 0, 1);
                         break;
 
                     default: break;
@@ -132,11 +212,13 @@ int main(void) {
             }
         } 
 
-        C_ConsoleClear(Console);
-        C_ConsolePutCharAt(Console, Player->Glyph, 
-                Player->Position.x, Player->Position.y, COLOR_RED);
-        SDL_UpdateTexture(GlobalGameRender.Screen, 0,
-                Console->Pixels, Console->Pitch);
+        ECS_Entity Player = GlobalEntityArray[PlayerID];
+        ECS_Entity Wall = GlobalEntityArray[WallID];
+
+        C_ConsoleClear(GlobalConsole);
+        C_ConsolePutCharAt(GlobalConsole, ECS_EntityGetGlyph(Player.Type), Player.Col, Player.Row, Player.Color);
+        C_ConsolePutCharAt(GlobalConsole, ECS_EntityGetGlyph(Wall.Type), Wall.Col, Wall.Row, Wall.Color);
+        SDL_UpdateTexture(GlobalGameRender.Screen, 0, GlobalConsole->Pixels, GlobalConsole->Pitch);
         SDL_RenderClear(GlobalGameRender.Renderer);
         SDL_RenderCopy(GlobalGameRender.Renderer, GlobalGameRender.Screen,
                 0, 0);
