@@ -1,3 +1,3 @@
 #!/bin/sh
 
-gcc -lX11 -Wall xlibtut-0.c -o window
+gcc -lX11 -Wall src/xlibtut.c -o window

@@ -1,7 +1,7 @@
 #include <X11/X.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
@@ -36,10 +36,11 @@ int main(int argc, char **args)
     XSetWindowAttributes window_attributes;
     window_attributes.background_pixel = 0;
     window_attributes.colormap = XCreateColormap(display, default_root_window, visual_info.visual, AllocNone);
-    u32 attribute_mask = CWBackPixel | CWColormap;
+    window_attributes.event_mask = StructureNotifyMask;
+    u32 attribute_mask = CWBackPixel | CWColormap | CWEventMask;
 
     Window window = XCreateWindow(display, default_root_window, 0, 0, screen_width, screen_height, 0, visual_info.depth,
-                       InputOutput, visual_info.visual, attribute_mask, &window_attributes);
+                                  InputOutput, visual_info.visual, attribute_mask, &window_attributes);
     if (!window)
     {
         fprintf(stderr, "%s:%d: XCreateWindow failed\n", __FILE__, __LINE__);
@@ -50,10 +51,29 @@ int main(int argc, char **args)
     XMapWindow(display, window);
     XFlush(display);
 
-    u32 count = 0;
-    while (count < 0xFFFFFFFF) {
-        count++;
+    int running = 1;
+    XEvent event;
+    while (running)
+    {
+        while (XPending(display))
+        {
+            XNextEvent(display, &event);
+            switch (event.type)
+            {
+            case DestroyNotify:
+            {
+                if (event.xdestroywindow.window == window)
+                {
+                    running = 0;
+                }
+            }
+            break;
+            case ButtonPress:
+            {
+                XButtonEvent* button_event = &event.xbutton;
+                button_event->
+            }
+            }
+        }
     }
-
-
 }
