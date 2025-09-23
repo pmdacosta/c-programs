@@ -33,11 +33,11 @@ typedef int64_t i64;
 #define COLOR(r, g, b, a) ((r << 24) | (g << 16) | (b << 8) | a)
 
 // Pallette
-#define COLOR_BLACK  COLOR(0x00, 0x00, 0x00, 0xFF)
-#define COLOR_WHITE  COLOR(0xFF, 0xFF, 0xFF, 0xFF)
-#define COLOR_RED    COLOR(0xFF, 0x00, 0x00, 0xFF)
-#define COLOR_GREEN  COLOR(0x00, 0xFF, 0x00, 0xFF)
-#define COLOR_BLUE   COLOR(0x00, 0x00, 0xFF, 0xFF)
+#define COLOR_BLACK COLOR(0x00, 0x00, 0x00, 0xFF)
+#define COLOR_WHITE COLOR(0xFF, 0xFF, 0xFF, 0xFF)
+#define COLOR_RED COLOR(0xFF, 0x00, 0x00, 0xFF)
+#define COLOR_GREEN COLOR(0x00, 0xFF, 0x00, 0xFF)
+#define COLOR_BLUE COLOR(0x00, 0x00, 0xFF, 0xFF)
 #define COLOR_YELLOW COLOR(0xFF, 0xFF, 0x00, 0xFF)
 #define COLOR_PURPLE COLOR(0x80, 0x00, 0x80, 0xFF)
 
@@ -54,7 +54,8 @@ int dark_init(void);
 #define CELL_HEIGHT 16
 #define TRANSPARENT_PIXEL COLOR_BLACK
 
-typedef struct {
+typedef struct
+{
     u32 *Pixels;
     u32 BitmapWidth;
     u32 BitmapHeight;
@@ -62,64 +63,70 @@ typedef struct {
     uchar FirstCharInBitmap;
 } C_Font;
 
-typedef struct {
+typedef struct
+{
     u32 x;
     u32 y;
     u32 w;
     u32 h;
 } C_Rect;
 
-typedef struct {
+typedef struct
+{
     u32 x;
     u32 y;
 } C_Position;
 
-typedef struct {
+typedef struct
+{
     C_Position Position;
     uchar Glyph;
 } C_Player;
 
-typedef struct {
-    u32 *Pixels;      // the screen pixels
+typedef struct
+{
+    u32 *Pixels; // the screen pixels
     u32 Pitch;
     u32 Rows;
     u32 Cols;
     C_Rect Rect;
-    C_Font* Font;
-    C_Player* Player;
+    C_Font *Font;
+    C_Player *Player;
 } C_Console;
 
-C_Console* C_ConsoleInit(void);
+C_Console *C_ConsoleInit(void);
 
-void C_ConsoleFree(C_Console* Console);
+void C_ConsoleFree(C_Console *Console);
 
 int C_ConsoleSetBitmapFont(C_Console *Console, const char *File);
 
 void C_ConsoleClear(C_Console *Console);
 
-void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, 
-                    u32 Row, u32 Col,
-                    u32 FGColor);
+void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, u32 Row, u32 Col,
+                        u32 FGColor);
 
-void C_ConsoleFillRect(u32* Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
+void C_ConsoleFillRect(u32 *Pixels, u32 Pitch, C_Rect *DestRect,
+                       u32 SourceColor);
 
 C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph);
 
-void C_Debug_PrintAtlas(C_Console* Console);
+void C_Debug_PrintAtlas(C_Console *Console);
 
-void C_Debug_DrawGradient(C_Console* Console, int xOffset, int yOffset);
+void C_Debug_DrawGradient(C_Console *Console, int xOffset, int yOffset);
 
 // == ECS ===============================
 
 #define ECS_ENTITIES_MAX 16
 
-typedef enum {
+typedef enum
+{
     ECS_ENTITY_PLAYER,
     ECS_ENTITY_WALL,
     ECS_ENTITY_TOTAL
 } ECS_EntityType;
 
-typedef struct {
+typedef struct
+{
     ECS_EntityType Type; // NOTE: put Type at different place to improve struct memory layout?
     u32 Row;
     u32 Col;
