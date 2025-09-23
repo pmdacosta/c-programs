@@ -22,3 +22,4 @@
 - [Austin Morlan's Pong Clone](https://austinmorlan.com/posts/pong_clone/)
     - It's in C++ but I'll recode it in C
 - [Simple sokoban game](https://en.wikipedia.org/wiki/Sokoban)
+- [Handmade Penguin](https://davidgow.net/handmadepenguin/)
