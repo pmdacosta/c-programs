@@ -9,6 +9,47 @@
 
 typedef uint32_t u32;
 
+void set_size_hint(Display* display, Window window, int min_width, int min_height, int max_width, int max_height);
+Status toggle_maximize_window(Display* display, Window window, Window default_root_window);
+
+void set_size_hint(Display* display, Window window, int min_width, int min_height, int max_width, int max_height)
+{
+    XSizeHints hints = {};
+    if (min_width && min_height) hints.flags |= PMinSize;
+    if (max_width && max_height) hints.flags |= PMaxSize;
+
+    hints.min_width = min_width;
+    hints.min_height = min_height;
+    hints.max_width = max_width;
+    hints.max_height = max_height;
+
+    XSetNormalHints(display, window, &hints);
+}
+
+Status toggle_maximize_window(Display* display, Window window, Window default_root_window) {
+    XClientMessageEvent event = {};
+    Atom wm_state = XInternAtom(display, "_NET_WM_STATE", True);
+    Atom state_toggle = XInternAtom(display, "_NET_WM_STATE_TOGGLE", True);
+    Atom maximized_horizontal = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", True);
+    Atom maximized_vertical = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", True);
+
+    if (wm_state == None) {
+        return 0;
+    }
+
+    event.type = ClientMessage;
+    event.format = 32;
+    event.window = window;
+    event.message_type = wm_state;
+    event.data.l[0] = state_toggle;
+    event.data.l[1] = maximized_horizontal;
+    event.data.l[2] = maximized_vertical;
+    event.data.l[3] = 1; // 1 for normal applications
+
+    return XSendEvent(display, default_root_window, False, SubstructureNotifyMask, (XEvent*)&event);
+}
+
+
 int main(int argc, char **args)
 {
     int screen_width = 800;
@@ -21,7 +62,7 @@ int main(int argc, char **args)
         exit(1);
     }
 
-    int default_root_window = DefaultRootWindow(display); // We are making a normal "top level" window,
+    Window default_root_window = DefaultRootWindow(display); // We are making a normal "top level" window,
                                                           // so our parent needs to be the "desktop", this is what the root window is.
     int default_screen = DefaultScreen(display);
 
@@ -48,7 +89,9 @@ int main(int argc, char **args)
     }
 
     XStoreName(display, window, "Hello World");
+    set_size_hint(display, window, 400, 300, 0, 0);
     XMapWindow(display, window);
+    toggle_maximize_window(display, window, default_root_window);
     XFlush(display);
 
     int running = 1;
@@ -68,11 +111,6 @@ int main(int argc, char **args)
                 }
             }
             break;
-            case ButtonPress:
-            {
-                XButtonEvent* button_event = &event.xbutton;
-                button_event->
-            }
             }
         }
     }
