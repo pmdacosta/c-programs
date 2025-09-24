@@ -161,8 +161,6 @@ void ECS_Init(void)
 void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
 {
     ECS_Entity Entity = GlobalEntityArray[EntityID];
-    printf("DEBUG %d: ROWCHANGE: %d COLCHANGE: %d\n", __LINE__, RowChange,
-           ColChange);
 
     if (Entity.Row == 0 && RowChange < 0)
         return;
@@ -172,7 +170,7 @@ void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
     u32 Row = Entity.Row + RowChange;
     u32 Col = Entity.Col + ColChange;
 
-    if (Row >= GlobalConsole->Rows || Col >= GlobalConsole->Cols)
+    if (Row >= C_ROWS || Col >= C_COLS)
         return;
 
     for (u32 SearchEntityID = 0; SearchEntityID < GlobalEntityCount;
@@ -193,8 +191,95 @@ void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
 
     GlobalEntityArray[EntityID].Row = Row;
     GlobalEntityArray[EntityID].Col = Col;
-    printf("DEBUG %d: ROW: %d COL: %d\n", __LINE__,
-           GlobalEntityArray[EntityID].Row, GlobalEntityArray[EntityID].Col);
+}
+
+// ======================================
+
+// == MAP ===============================
+
+uchar GlobalMap[C_ROWS][C_COLS];
+
+void map_generate(void)
+{
+    // memset(&GlobalMap, '#', sizeof GlobalMap);
+    for (int y = 0; y < C_ROWS; y++)
+    {
+        for (int x = 0; x < C_COLS; x++)
+        {
+            GlobalMap[y][x] = '#';
+        }
+    }
+
+    int rooms_total = 10;
+    int room_min_width = 5;
+    int room_min_height = 3;
+    int room_max_width = 20;
+    int room_max_height = 15;
+    C_Rect rooms[rooms_total];
+
+    int room_index = 0;
+    while (room_index < rooms_total)
+    {
+        u32 r1w = rand() % (room_max_width - room_min_width + 1) + room_min_width;
+        u32 r1h = rand() % (room_max_height - room_min_height + 1) + room_min_height;
+        u32 r1x = rand() % (C_COLS - r1w - 2) + 1;
+        u32 r1y = rand() % (C_ROWS - r1h - 2) + 1;
+
+		int flag_collides = 0;
+        // check collisions
+        for (int room_check_index = 0; room_check_index < room_index; room_check_index++)
+        {
+            u32 r2w = rooms[room_check_index].w;
+            u32 r2h = rooms[room_check_index].h;
+            u32 r2x = rooms[room_check_index].x;
+            u32 r2y = rooms[room_check_index].y;
+
+			// Box collision
+			// https://jeffreythompson.org/collision-detection/rect-rect.php
+            if (r1x + r1w >= r2x && // r1 right edge past r2 left
+                r1x <= r2x + r2w && // r1 left edge past r2 right
+                r1y + r1h >= r2y && // r1 top edge past r2 bottom
+                r1y <= r2y + r2h)   // r1 bottom edge past r2 top
+			{ 
+				flag_collides = 1;
+				break;
+			}
+        }
+
+		if (!flag_collides) {
+			rooms[room_index].w = r1w;
+			rooms[room_index].h = r1h;
+			rooms[room_index].x = r1x;
+			rooms[room_index].y = r1y;
+			room_index++;
+		}
+    }
+
+    for (room_index = 0; room_index < rooms_total; room_index++)
+    {
+        u32 w = rooms[room_index].w;
+        u32 h = rooms[room_index].h;
+        u32 x = rooms[room_index].x;
+        u32 y = rooms[room_index].y;
+        for (u32 Row = y; Row < y + h; Row++)
+        {
+            for (u32 Col = x; Col < x + w; Col++)
+            {
+                GlobalMap[Row][Col] = ' ';
+            }
+        }
+    }
+}
+
+void map_draw(void)
+{
+    for (int Row = 0; Row < C_ROWS; Row++)
+    {
+        for (int Col = 0; Col < C_COLS; Col++)
+        {
+            C_ConsolePutCharAt(GlobalConsole, GlobalMap[Row][Col], Row, Col, COLOR_WHITE);
+        }
+    }
 }
 
 // ======================================
@@ -210,16 +295,19 @@ int main(void)
 
     srand(time(0));
 
+    map_generate();
+
     SDL_Event Event;
     int running = 1;
-    u32 PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, 25, 25, COLOR_GREEN);
-
-    // NOTE: testing code only - remove it
-    for (int i = 0; i < 40; i++)
-    {
-        ECS_EntityAdd(ECS_ENTITY_WALL, rand() % GlobalConsole->Rows,
-                      rand() % GlobalConsole->Cols, COLOR_RED);
+    // pick starting player position
+    u32 PlayerStartRow;
+    u32 PlayerStartCol;
+    while (1) {
+        PlayerStartRow = rand() % C_ROWS;
+        PlayerStartCol = rand() % C_COLS;
+        if (GlobalMap[PlayerStartRow][PlayerStartCol] == ' ') break;
     }
+    u32 PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, PlayerStartRow, PlayerStartCol, COLOR_GREEN);
 
     while (running)
     {
@@ -265,6 +353,8 @@ int main(void)
         }
 
         C_ConsoleClear(GlobalConsole);
+
+        map_draw();
 
         // Draw Entities
         ECS_Entity *Entity;

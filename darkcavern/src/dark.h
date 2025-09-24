@@ -52,6 +52,8 @@ int dark_init(void);
 // ---------- console.c ----------
 #define CELL_WIDTH 16
 #define CELL_HEIGHT 16
+#define C_ROWS 45
+#define C_COLS 80
 #define TRANSPARENT_PIXEL COLOR_BLACK
 
 typedef struct
@@ -79,19 +81,10 @@ typedef struct
 
 typedef struct
 {
-    C_Position Position;
-    uchar Glyph;
-} C_Player;
-
-typedef struct
-{
     u32 *Pixels; // the screen pixels
     u32 Pitch;
-    u32 Rows;
-    u32 Cols;
     C_Rect Rect;
     C_Font *Font;
-    C_Player *Player;
 } C_Console;
 
 C_Console *C_ConsoleInit(void);
@@ -142,4 +135,10 @@ void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange);
 
 // ======================================
 
+// === MAP ==============================
+
+void map_generate(void);
+void map_draw(void);
+
+// ======================================
 #endif

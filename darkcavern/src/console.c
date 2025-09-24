@@ -8,28 +8,6 @@
 // or 0 (NULL) on error
 C_Console *C_ConsoleInit(void)
 {
-    u32 Cols = SCREEN_WIDTH / CELL_WIDTH;
-    u32 Rows = SCREEN_HEIGHT / CELL_HEIGHT;
-    // Width must be a multiple of Cols
-    if (SCREEN_WIDTH % Cols != 0)
-    {
-        fprintf(
-            stderr,
-            "%s:%d: Error in C_ConsoleInit: Width must be a multiple of Cols\n",
-            __FILE__, __LINE__);
-        return 0;
-    }
-
-    // Height must be a multiple of Rows
-    if (SCREEN_HEIGHT % Rows != 0)
-    {
-        fprintf(stderr,
-                "%s:%d: Error in C_ConsoleInit: Height must be a multiple of "
-                "Rows\n",
-                __FILE__, __LINE__);
-        return 0;
-    }
-
     C_Console *Console = malloc(sizeof(C_Console));
 
     Console->Pixels = calloc((u32)SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(u32));
@@ -39,21 +17,9 @@ C_Console *C_ConsoleInit(void)
         return 0;
     }
     Console->Pitch = SCREEN_WIDTH * sizeof(u32);
-    Console->Rows = Rows;
-    Console->Cols = Cols;
     Console->Font = NULL;
     C_Rect Rect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
     Console->Rect = Rect;
-
-    Console->Player = malloc(sizeof(C_Player));
-    if (!Console->Player)
-    {
-        fprintf(stderr, "%s:%d: malloc failed\n", __FILE__, __LINE__);
-        return 0;
-    }
-    Console->Player->Glyph = '@';
-    Console->Player->Position.x = 10;
-    Console->Player->Position.y = 10;
 
     return Console;
 }
@@ -68,7 +34,6 @@ void C_ConsoleFree(C_Console *Console)
             free(Console->Font);
         }
         free(Console->Pixels);
-        free(Console->Player);
         free(Console);
     }
 }
