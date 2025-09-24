@@ -7,6 +7,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
+typedef uint8_t  u8;
 typedef uint32_t u32;
 
 void set_size_hint(Display* display, Window window, int min_width, int min_height, int max_width, int max_height);
@@ -94,8 +95,33 @@ int main(int argc, char **args)
     toggle_maximize_window(display, window, default_root_window);
     XFlush(display);
 
+    int pixel_bits = 32;
+    int pixel_bytes = pixel_bits/8;
+    int window_buffer_size = screen_width * screen_height * pixel_bytes;
+    int pitch = screen_width * pixel_bytes;
+    char* buffer = malloc(window_buffer_size);
+    if (!buffer) {
+        fprintf(stderr, "%s:%d: malloc failed\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    XImage* x_window_buffer = XCreateImage(display, visual_info.visual, visual_info.depth, ZPixmap, 0, buffer, screen_width, screen_height, pixel_bits, 0);
+    GC default_GC = DefaultGC(display, default_screen);
+
+
+    Atom wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", True);
+    if (!XSetWMProtocols(display, window, &wm_delete_window, 1)) {
+        fprintf(stderr, "%s:%d: Couldn't register WM_DELETE_WINDOW property\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+
+
     int running = 1;
+    int size_change = 0;
     XEvent event;
+    int x_offset = 0;
+    int y_offset = 0;
     while (running)
     {
         while (XPending(display))
@@ -110,8 +136,37 @@ int main(int argc, char **args)
                     running = 0;
                 }
             }
+            case ClientMessage:
+            {
+                XClientMessageEvent* message_event = (XClientMessageEvent*)&event;
+                if (message_event->data.l[0] == wm_delete_window) {
+                    XDestroyWindow(display, window);
+                    running = 0;
+                }
+            }
             break;
             }
         }
+
+        u8* row = (u8*) buffer;
+        for (int y = 0; y < screen_height; y++) {
+
+            u32* pixel = (u32*) row;
+            for (int x = 0; x < screen_width; x++) {
+                u8 red = x + x_offset;
+                u8 green = y + y_offset;
+                u8 blue = 0x00;
+                u8 alpha = 0xFF;
+                *pixel = alpha << 24 | red << 16| green << 8| blue;
+                pixel++;
+            }
+            row += pitch;
+        }
+
+        x_offset++;
+        y_offset++;
+
+        XPutImage(display, window, default_GC, x_window_buffer, 0, 0, 0, 0, screen_width, screen_height);
+
     }
 }

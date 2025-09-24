@@ -1,3 +1,3 @@
 #!/bin/sh
 
-gcc -lX11 -Wall src/xlibtut.c -o window
+gcc -std=c99 -lX11 -Wall src/xlibtut.c -o window
