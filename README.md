@@ -23,3 +23,4 @@
     - It's in C++ but I'll recode it in C
 - [Simple sokoban game](https://en.wikipedia.org/wiki/Sokoban)
 - [Handmade Penguin](https://davidgow.net/handmadepenguin/)
+- [Tetris](https://github.com/odyssjii/tetris)
