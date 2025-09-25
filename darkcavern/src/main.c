@@ -14,6 +14,7 @@ typedef struct
 
 global_variable GameRender GlobalGameRender;
 global_variable C_Console *GlobalConsole;
+global_variable uchar GlobalMap[C_ROWS][C_COLS];
 
 void dark_cleanup(void)
 {
@@ -173,6 +174,9 @@ void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
     if (Row >= C_ROWS || Col >= C_COLS)
         return;
 
+    if (GlobalMap[Row][Col] == '#')
+        return;
+
     for (u32 SearchEntityID = 0; SearchEntityID < GlobalEntityCount;
          SearchEntityID++)
     {
@@ -197,18 +201,9 @@ void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
 
 // == MAP ===============================
 
-uchar GlobalMap[C_ROWS][C_COLS];
-
 void map_generate(void)
 {
-    // memset(&GlobalMap, '#', sizeof GlobalMap);
-    for (int y = 0; y < C_ROWS; y++)
-    {
-        for (int x = 0; x < C_COLS; x++)
-        {
-            GlobalMap[y][x] = '#';
-        }
-    }
+    memset(&GlobalMap, '#', sizeof GlobalMap);
 
     int rooms_total = 10;
     int room_min_width = 5;
@@ -225,7 +220,7 @@ void map_generate(void)
         u32 r1x = rand() % (C_COLS - r1w - 2) + 1;
         u32 r1y = rand() % (C_ROWS - r1h - 2) + 1;
 
-		int flag_collides = 0;
+        int flag_collides = 0;
         // check collisions
         for (int room_check_index = 0; room_check_index < room_index; room_check_index++)
         {
@@ -234,25 +229,26 @@ void map_generate(void)
             u32 r2x = rooms[room_check_index].x;
             u32 r2y = rooms[room_check_index].y;
 
-			// Box collision
-			// https://jeffreythompson.org/collision-detection/rect-rect.php
+            // Box collision
+            // https://jeffreythompson.org/collision-detection/rect-rect.php
             if (r1x + r1w >= r2x && // r1 right edge past r2 left
                 r1x <= r2x + r2w && // r1 left edge past r2 right
                 r1y + r1h >= r2y && // r1 top edge past r2 bottom
                 r1y <= r2y + r2h)   // r1 bottom edge past r2 top
-			{ 
-				flag_collides = 1;
-				break;
-			}
+            {
+                flag_collides = 1;
+                break;
+            }
         }
 
-		if (!flag_collides) {
-			rooms[room_index].w = r1w;
-			rooms[room_index].h = r1h;
-			rooms[room_index].x = r1x;
-			rooms[room_index].y = r1y;
-			room_index++;
-		}
+        if (!flag_collides)
+        {
+            rooms[room_index].w = r1w;
+            rooms[room_index].h = r1h;
+            rooms[room_index].x = r1x;
+            rooms[room_index].y = r1y;
+            room_index++;
+        }
     }
 
     for (room_index = 0; room_index < rooms_total; room_index++)
@@ -302,10 +298,12 @@ int main(void)
     // pick starting player position
     u32 PlayerStartRow;
     u32 PlayerStartCol;
-    while (1) {
+    while (1)
+    {
         PlayerStartRow = rand() % C_ROWS;
         PlayerStartCol = rand() % C_COLS;
-        if (GlobalMap[PlayerStartRow][PlayerStartCol] == ' ') break;
+        if (GlobalMap[PlayerStartRow][PlayerStartCol] == ' ')
+            break;
     }
     u32 PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, PlayerStartRow, PlayerStartCol, COLOR_GREEN);
 

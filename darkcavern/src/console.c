@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO: change order of functions to match header file
-
 // Returns pointer to a C_Console on success
 // or 0 (NULL) on error
 C_Console *C_ConsoleInit(void)
