@@ -41,15 +41,30 @@ typedef int64_t i64;
 #define COLOR_YELLOW COLOR(0xFF, 0xFF, 0x00, 0xFF)
 #define COLOR_PURPLE COLOR(0x80, 0x00, 0x80, 0xFF)
 
-// ---------- main.c ----------
+#define COLOR_WALL COLOR(0x67, 0x56, 0x44, 0xFF)
+
+
+// === DARK =============================
+
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
 
-void dark_cleanup(void);
-void dark_exit(int status);
-int dark_init(void);
+typedef struct
+{
+    SDL_Window *Window;
+    SDL_Renderer *Renderer;
+    SDL_Texture *Screen;
+    int Pitch;
+} GameRender;
 
-// ---------- console.c ----------
+// void dark_cleanup(void);
+// void dark_exit(int status);
+// int dark_init(void);
+
+// ======================================
+
+// === CONSOLE ==========================
+
 #define CELL_WIDTH 16
 #define CELL_HEIGHT 16
 #define C_ROWS 45
@@ -87,25 +102,17 @@ typedef struct
     C_Font *Font;
 } C_Console;
 
-C_Console *C_ConsoleInit(void);
+// C_Console *C_ConsoleInit(void);
+// void C_ConsoleFree(C_Console *Console);
+// int C_ConsoleSetBitmapFont(C_Console *Console, const char *File);
+// void C_ConsoleClear(C_Console *Console);
+// void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, u32 Row, u32 Col, u32 FGColor);
+// void C_ConsoleFillRect(u32 *Pixels, u32 Pitch, C_Rect *DestRect, u32 SourceColor);
+// C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph);
+// void C_Debug_PrintAtlas(C_Console *Console);
+// void C_Debug_DrawGradient(C_Console *Console, int xOffset, int yOffset);
 
-void C_ConsoleFree(C_Console *Console);
-
-int C_ConsoleSetBitmapFont(C_Console *Console, const char *File);
-
-void C_ConsoleClear(C_Console *Console);
-
-void C_ConsolePutCharAt(C_Console *Console, uchar Glyph, u32 Row, u32 Col,
-                        u32 FGColor);
-
-void C_ConsoleFillRect(u32 *Pixels, u32 Pitch, C_Rect *DestRect,
-                       u32 SourceColor);
-
-C_Rect C_FontGetGlyphRect(C_Font *Font, uchar Glyph);
-
-void C_Debug_PrintAtlas(C_Console *Console);
-
-void C_Debug_DrawGradient(C_Console *Console, int xOffset, int yOffset);
+// ======================================
 
 // == ECS ===============================
 
@@ -127,18 +134,23 @@ typedef struct
     u8 Active;
 } ECS_Entity;
 
-uchar ECS_EntityGetGlyph(ECS_EntityType Type);
-u32 ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color);
-void ECS_DisableEntity(int EntityID);
-void ECS_Init(void);
-void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange);
+// uchar ECS_EntityGetGlyph(ECS_EntityType Type);
+// u32 ECS_EntityAdd(ECS_EntityType Type, u32 Row, u32 Col, u32 Color);
+// void ECS_DisableEntity(int EntityID);
+// void ECS_Init(void);
+// void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange);
 
 // ======================================
 
 // === MAP ==============================
 
-void map_generate(void);
-void map_draw(void);
+#define HUD_ROWS 5
+#define MAP_ROWS C_ROWS - HUD_ROWS
+#define MAP_COLS C_COLS
+
+// void map_generate(void);
+// void map_draw(void);
 
 // ======================================
+
 #endif
