@@ -145,7 +145,7 @@ typedef struct
 // === MAP ==============================
 
 #define HUD_ROWS 5
-#define MAP_ROWS C_ROWS - HUD_ROWS
+#define MAP_ROWS (C_ROWS - HUD_ROWS)
 #define MAP_COLS C_COLS
 
 // void map_generate(void);

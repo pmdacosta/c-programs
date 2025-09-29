@@ -19,8 +19,12 @@ CFLAGS='-std=c99
 -Wswitch-default
 -Wold-style-definition
 -Wmissing-include-dirs
--fsanitize=address
--fsanitize-address-use-after-scope'
+-g'
 LIBS='-lSDL2 -lSDL2_image'
 
 gcc $CFLAGS src/main.c -o game $LIBS
+
+
+# -fsanitize=address
+# -fsanitize-address-use-after-scope
+# -Wconversion
