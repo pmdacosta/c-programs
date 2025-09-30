@@ -16,7 +16,7 @@ int main(void)
 
     ECS_Init();
 
-    srand(time(0));
+    srand((u32)time(0));
 
     map_generate();
 
