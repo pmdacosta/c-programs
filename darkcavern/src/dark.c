@@ -5,6 +5,7 @@
 #include <math.h>
 
 global_variable uchar GlobalMap[MAP_ROWS][MAP_COLS];
+global_variable uchar GlobalMapSeen[MAP_ROWS][MAP_COLS];
 global_variable u32 GlobalPlayerID;
 global_variable GameRender GlobalGameRender;
 global_variable C_Console *GlobalConsole;
@@ -418,6 +419,7 @@ internal void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
 internal void map_generate(void)
 {
     memset(&GlobalMap, '#', sizeof GlobalMap);
+    memset(&GlobalMapSeen, ' ', sizeof GlobalMap);
 
     int rooms_total = 5;
     int room_min_width = 5;
@@ -545,11 +547,19 @@ internal  void map_draw(void)
         {
             int Distance = (int) sqrt((float)(square(Player.Row - Row) + square(Player.Col - Col)));
             if (Distance <= DrawDistance) {
-                C_ConsolePutCharAt(GlobalConsole, GlobalMap[Row][Col], Row, Col, COLOR_WALL);
+                GlobalMapSeen[Row][Col] = GlobalMap[Row][Col];
             }
             Col++;
         }
         Row++;
+    }
+
+    for (int Row = 0; Row < MAP_ROWS; Row++)
+    {
+        for (int Col = 0; Col < MAP_COLS; Col++)
+        {
+            C_ConsolePutCharAt(GlobalConsole, GlobalMapSeen[Row][Col], Row, Col, COLOR_WALL);
+        }
     }
 }
 
