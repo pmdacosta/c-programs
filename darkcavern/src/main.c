@@ -22,17 +22,6 @@ int main(void)
 
     SDL_Event Event;
     int running = 1;
-    // pick starting player position
-    u32 PlayerStartRow;
-    u32 PlayerStartCol;
-    while (1)
-    {
-        PlayerStartRow = rand() % MAP_ROWS;
-        PlayerStartCol = rand() % MAP_COLS;
-        if (GlobalMap[PlayerStartRow][PlayerStartCol] == ' ')
-            break;
-    }
-    u32 PlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, PlayerStartRow, PlayerStartCol, COLOR_GREEN);
 
     while (running)
     {
@@ -56,19 +45,19 @@ int main(void)
                     return 0;
 
                 case SDLK_UP:
-                    ECS_EntityMoveBy(PlayerID, -1, 0);
+                    ECS_EntityMoveBy(GlobalPlayerID, -1, 0);
                     break;
 
                 case SDLK_DOWN:
-                    ECS_EntityMoveBy(PlayerID, 1, 0);
+                    ECS_EntityMoveBy(GlobalPlayerID, 1, 0);
                     break;
 
                 case SDLK_LEFT:
-                    ECS_EntityMoveBy(PlayerID, 0, -1);
+                    ECS_EntityMoveBy(GlobalPlayerID, 0, -1);
                     break;
 
                 case SDLK_RIGHT:
-                    ECS_EntityMoveBy(PlayerID, 0, 1);
+                    ECS_EntityMoveBy(GlobalPlayerID, 0, 1);
                     break;
 
                 default:

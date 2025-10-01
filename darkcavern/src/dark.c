@@ -3,6 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+global_variable uchar GlobalMap[MAP_ROWS][MAP_COLS];
+global_variable u32 GlobalPlayerID;
+global_variable GameRender GlobalGameRender;
+global_variable C_Console *GlobalConsole;
+global_variable ECS_Entity GlobalEntityArray[ECS_ENTITIES_MAX];
+global_variable u32 GlobalEntityIDAvailable = 0;
+global_variable u32 GlobalEntityCount = 0;
 
 // === CONSOLE ==========================
 
@@ -212,8 +219,6 @@ internal void C_Debug_DrawGradient(C_Console *Console, int xOffset, int yOffset)
 
 // == DARK ==============================
 
-global_variable GameRender GlobalGameRender;
-global_variable C_Console *GlobalConsole;
 
 internal void dark_cleanup(void)
 {
@@ -300,133 +305,8 @@ internal int dark_init(void)
 
 // ======================================
 
-// == MAP ===============================
-
-global_variable uchar GlobalMap[MAP_ROWS][MAP_COLS];
-
-internal void map_generate(void)
-{
-    memset(&GlobalMap, '#', sizeof GlobalMap);
-
-    int rooms_total = 20;
-    int room_min_width = 5;
-    int room_min_height = 3;
-    int room_max_width = 30;
-    int room_max_height = 20;
-    C_Rect rooms[rooms_total];
-
-    int room_index = 0;
-    while (room_index < rooms_total)
-    {
-        u32 r1w = rand() % (room_max_width - room_min_width + 1) + room_min_width;
-        u32 r1h = rand() % (room_max_height - room_min_height + 1) + room_min_height;
-        u32 r1x = rand() % (MAP_COLS - r1w - 2) + 1;
-        u32 r1y = rand() % (MAP_ROWS - r1h - 2) + 1;
-
-        int flag_collides = 0;
-        // check collisions
-        for (int room_check_index = 0; room_check_index < room_index; room_check_index++)
-        {
-            u32 r2w = rooms[room_check_index].w;
-            u32 r2h = rooms[room_check_index].h;
-            u32 r2x = rooms[room_check_index].x;
-            u32 r2y = rooms[room_check_index].y;
-
-            // Box collision
-            // https://jeffreythompson.org/collision-detection/rect-rect.php
-            if (r1x + r1w >= r2x && // r1 right edge past r2 left
-                r1x <= r2x + r2w && // r1 left edge past r2 right
-                r1y + r1h >= r2y && // r1 top edge past r2 bottom
-                r1y <= r2y + r2h)   // r1 bottom edge past r2 top
-            {
-                flag_collides = 1;
-                break;
-            }
-        }
-
-        if (!flag_collides)
-        {
-            rooms[room_index].w = r1w;
-            rooms[room_index].h = r1h;
-            rooms[room_index].x = r1x;
-            rooms[room_index].y = r1y;
-            room_index++;
-        }
-    }
-
-    for (room_index = 0; room_index < rooms_total; room_index++)
-    {
-        u32 w = rooms[room_index].w;
-        u32 h = rooms[room_index].h;
-        u32 x = rooms[room_index].x;
-        u32 y = rooms[room_index].y;
-        for (u32 Row = y; Row < y + h; Row++)
-        {
-            for (u32 Col = x; Col < x + w; Col++)
-            {
-                GlobalMap[Row][Col] = ' ';
-            }
-        }
-    }
-
-    for (int i = 0; i < rooms_total - 1; i++)
-    {
-        int x1 = (rand() % rooms[i].w) + rooms[i].x;
-        int x2 = (rand() % rooms[i + 1].w) + rooms[i + 1].x;
-        int y1 = (rand() % rooms[i].h) + rooms[i].y;
-        int y2 = (rand() % rooms[i + 1].h) + rooms[i + 1].y;
-
-        if (rand() % 2) {
-
-            int x_direction = x1 < x2 ? 1 : -1;
-            while (x1 != x2)
-            {
-                GlobalMap[y1][x1] = ' ';
-                x1 += x_direction;
-            }
-
-            int y_direction = y1 < y2 ? 1 : -1;
-            while (y1 != y2)
-            {
-                GlobalMap[y1][x1] = ' ';
-                y1 += y_direction;
-            }
-        } else {
-            int y_direction = y1 < y2 ? 1 : -1;
-            while (y1 != y2)
-            {
-                GlobalMap[y1][x1] = ' ';
-                y1 += y_direction;
-            }
-
-            int x_direction = x1 < x2 ? 1 : -1;
-            while (x1 != x2)
-            {
-                GlobalMap[y1][x1] = ' ';
-                x1 += x_direction;
-            }
-        }
-    }
-}
-
-internal  void map_draw(void)
-{
-    for (int Row = 0; Row < MAP_ROWS; Row++)
-    {
-        for (int Col = 0; Col < MAP_COLS; Col++)
-        {
-            C_ConsolePutCharAt(GlobalConsole, GlobalMap[Row][Col], Row, Col, COLOR_WALL);
-        }
-    }
-}
-
-// ======================================
-
 // == ECS ===============================
 
-global_variable ECS_Entity GlobalEntityArray[ECS_ENTITIES_MAX];
-global_variable u32 GlobalEntityIDAvailable = 0;
-global_variable u32 GlobalEntityCount = 0;
 
 internal  uchar ECS_EntityGetGlyph(ECS_EntityType Type)
 {
@@ -523,3 +403,127 @@ internal void ECS_EntityMoveBy(u32 EntityID, int RowChange, int ColChange)
 
 // ======================================
 
+// == MAP ===============================
+
+internal void map_generate(void)
+{
+    memset(&GlobalMap, '#', sizeof GlobalMap);
+
+    int rooms_total = 5;
+    int room_min_width = 5;
+    int room_min_height = 3;
+    int room_max_width = 30;
+    int room_max_height = 20;
+    C_Rect rooms[rooms_total];
+
+    int room_index = 0;
+    while (room_index < rooms_total)
+    {
+        u32 r1w = rand() % (room_max_width - room_min_width + 1) + room_min_width;
+        u32 r1h = rand() % (room_max_height - room_min_height + 1) + room_min_height;
+        u32 r1x = rand() % (MAP_COLS - r1w - 2) + 1;
+        u32 r1y = rand() % (MAP_ROWS - r1h - 2) + 1;
+
+        int flag_collides = 0;
+        // check collisions
+        for (int room_check_index = 0; room_check_index < room_index; room_check_index++)
+        {
+            u32 r2w = rooms[room_check_index].w;
+            u32 r2h = rooms[room_check_index].h;
+            u32 r2x = rooms[room_check_index].x;
+            u32 r2y = rooms[room_check_index].y;
+
+            // Box collision
+            // https://jeffreythompson.org/collision-detection/rect-rect.php
+            if (r1x + r1w >= r2x && // r1 right edge past r2 left
+                r1x <= r2x + r2w && // r1 left edge past r2 right
+                r1y + r1h >= r2y && // r1 top edge past r2 bottom
+                r1y <= r2y + r2h)   // r1 bottom edge past r2 top
+            {
+                flag_collides = 1;
+                break;
+            }
+        }
+
+        if (!flag_collides)
+        {
+            rooms[room_index].w = r1w;
+            rooms[room_index].h = r1h;
+            rooms[room_index].x = r1x;
+            rooms[room_index].y = r1y;
+            room_index++;
+        }
+    }
+
+    for (room_index = 0; room_index < rooms_total; room_index++)
+    {
+        u32 w = rooms[room_index].w;
+        u32 h = rooms[room_index].h;
+        u32 x = rooms[room_index].x;
+        u32 y = rooms[room_index].y;
+        for (u32 Row = y; Row < y + h; Row++)
+        {
+            for (u32 Col = x; Col < x + w; Col++)
+            {
+                GlobalMap[Row][Col] = ' ';
+            }
+        }
+    }
+
+    int player_start_room = rand() % rooms_total;
+    u32 player_start_col = rooms[player_start_room].x + rand() % rooms[player_start_room].w;
+    u32 player_start_row  = rooms[player_start_room].y + rand() % rooms[player_start_room].h;
+    GlobalPlayerID = ECS_EntityAdd(ECS_ENTITY_PLAYER, player_start_row, player_start_col, COLOR_GREEN);
+
+    for (int i = 0; i < rooms_total - 1; i++)
+    {
+        int x1 = (rand() % rooms[i].w) + rooms[i].x;
+        int x2 = (rand() % rooms[i + 1].w) + rooms[i + 1].x;
+        int y1 = (rand() % rooms[i].h) + rooms[i].y;
+        int y2 = (rand() % rooms[i + 1].h) + rooms[i + 1].y;
+
+        if (rand() % 2) {
+
+            int x_direction = x1 < x2 ? 1 : -1;
+            while (x1 != x2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                x1 += x_direction;
+            }
+
+            int y_direction = y1 < y2 ? 1 : -1;
+            while (y1 != y2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                y1 += y_direction;
+            }
+        } else {
+            int y_direction = y1 < y2 ? 1 : -1;
+            while (y1 != y2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                y1 += y_direction;
+            }
+
+            int x_direction = x1 < x2 ? 1 : -1;
+            while (x1 != x2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                x1 += x_direction;
+            }
+        }
+    }
+}
+
+internal  void map_draw(void)
+{
+    for (int Row = 0; Row < MAP_ROWS; Row++)
+    {
+        for (int Col = 0; Col < MAP_COLS; Col++)
+        {
+            C_ConsolePutCharAt(GlobalConsole, GlobalMap[Row][Col], Row, Col, COLOR_WALL);
+        }
+    }
+}
+
+// ======================================
