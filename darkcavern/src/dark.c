@@ -2,6 +2,7 @@
 #include "dark.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 global_variable uchar GlobalMap[MAP_ROWS][MAP_COLS];
 global_variable u32 GlobalPlayerID;
@@ -10,6 +11,15 @@ global_variable C_Console *GlobalConsole;
 global_variable ECS_Entity GlobalEntityArray[ECS_ENTITIES_MAX];
 global_variable u32 GlobalEntityIDAvailable = 0;
 global_variable u32 GlobalEntityCount = 0;
+
+// === MATH =============================
+
+inline internal u32 square(u32 a)
+{
+    return a * a;
+}
+
+// ======================================
 
 // === CONSOLE ==========================
 
@@ -516,6 +526,34 @@ internal void map_generate(void)
 }
 
 internal  void map_draw(void)
+{
+    ECS_Entity Player = GlobalEntityArray[GlobalPlayerID];
+    int DrawDistance = 5;
+    int CheckDistance = 10;
+    int Row = Player.Row - CheckDistance;
+    int TargetRow = Player.Row + CheckDistance;
+    if (Row < 0) Row = 0;
+    if (TargetRow >= MAP_ROWS) TargetRow = MAP_ROWS - 1;
+
+    while (Row <= TargetRow)
+    {
+        int Col = Player.Col - CheckDistance;
+        int TargetCol = Player.Col + CheckDistance;
+        if (Col < 0) Col = 0;
+        if (TargetCol >= MAP_COLS) TargetCol = MAP_COLS - 1;
+        while (Col <= TargetCol)
+        {
+            int Distance = (int) sqrt((float)(square(Player.Row - Row) + square(Player.Col - Col)));
+            if (Distance <= DrawDistance) {
+                C_ConsolePutCharAt(GlobalConsole, GlobalMap[Row][Col], Row, Col, COLOR_WALL);
+            }
+            Col++;
+        }
+        Row++;
+    }
+}
+
+internal  void debug_map_draw(void)
 {
     for (int Row = 0; Row < MAP_ROWS; Row++)
     {

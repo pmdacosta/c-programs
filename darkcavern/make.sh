@@ -21,7 +21,7 @@ CFLAGS='-std=c99
 -Wnon-literal-null-conversion
 -Wnull-conversion
 -g'
-LIBS='-lSDL2 -lSDL2_image'
+LIBS='-lSDL2 -lSDL2_image -lm'
 
 clang $CFLAGS src/main.c -o game $LIBS
 

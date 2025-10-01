@@ -68,7 +68,7 @@ int main(void)
 
         C_ConsoleClear(GlobalConsole);
 
-        map_draw();
+        debug_map_draw();
 
         // Draw Entities
         ECS_Entity *Entity;
