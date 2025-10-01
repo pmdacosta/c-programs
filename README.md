@@ -1,6 +1,6 @@
 # c-programs
 
-## References
+### References
 
 - [Linux Howtos: C/C++ > Sockets Tutorial](https://www.linuxhowtos.org/C_C++/socket.htm)
 - [Sockets and Network Programming in C](https://www.codequoi.com/en/sockets-and-network-programming-in-c/)
@@ -25,3 +25,8 @@
 - [Simple sokoban game](https://en.wikipedia.org/wiki/Sokoban)
 - [Handmade Penguin](https://davidgow.net/handmadepenguin/)
 - [Tetris](https://github.com/odyssjii/tetris)
+
+### Misc
+
+- [Gcc most common used flags](https://dvergeylen.github.io/gcc-most-common-used-flags)
+- [How can I hide "defined but not used" warnings in GCC?](https://stackoverflow.com/questions/386220/how-can-i-hide-defined-but-not-used-warnings-in-gcc)
