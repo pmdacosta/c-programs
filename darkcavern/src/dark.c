@@ -308,7 +308,7 @@ internal void map_generate(void)
 {
     memset(&GlobalMap, '#', sizeof GlobalMap);
 
-    int rooms_total = 6;
+    int rooms_total = 20;
     int room_min_width = 5;
     int room_min_height = 3;
     int room_max_width = 30;
@@ -376,18 +376,35 @@ internal void map_generate(void)
         int y1 = (rand() % rooms[i].h) + rooms[i].y;
         int y2 = (rand() % rooms[i + 1].h) + rooms[i + 1].y;
 
-        int x_direction = x1 < x2 ? 1 : -1;
-        while (x1 != x2)
-        {
-            GlobalMap[y1][x1] = ' ';
-            x1 += x_direction;
-        }
+        if (rand() % 2) {
 
-        int y_direction = y1 < y2 ? 1 : -1;
-        while (y1 != y2)
-        {
-            GlobalMap[y1][x1] = ' ';
-            y1 += y_direction;
+            int x_direction = x1 < x2 ? 1 : -1;
+            while (x1 != x2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                x1 += x_direction;
+            }
+
+            int y_direction = y1 < y2 ? 1 : -1;
+            while (y1 != y2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                y1 += y_direction;
+            }
+        } else {
+            int y_direction = y1 < y2 ? 1 : -1;
+            while (y1 != y2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                y1 += y_direction;
+            }
+
+            int x_direction = x1 < x2 ? 1 : -1;
+            while (x1 != x2)
+            {
+                GlobalMap[y1][x1] = ' ';
+                x1 += x_direction;
+            }
         }
     }
 }
