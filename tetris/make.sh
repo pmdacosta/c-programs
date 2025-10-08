@@ -19,6 +19,7 @@ CFLAGS='-std=c99
 -Wliteral-conversion
 -Wimplicit-conversion-floating-point-to-bool
 -Wnon-literal-null-conversion
+-Wno-incompatible-pointer-types-discards-qualifiers
 -Wnull-conversion
 -g'
 LIBS='-lSDL2 -lSDL2_image -lm'

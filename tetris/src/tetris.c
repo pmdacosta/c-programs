@@ -58,6 +58,8 @@ typedef struct
 {
     u8 tetramino_index;
     u8 rotation;
+    i8 offset_row;
+    i8 offset_col;
 } PieceState;
 
 typedef struct
@@ -66,6 +68,78 @@ typedef struct
     PieceState piece;
     GameStatePhase phase;
 } GameState;
+
+typedef struct
+{
+    u8 left;
+    u8 right;
+    u8 up;
+} InputState;
+
+global_variable SDL_Window *global_window;
+global_variable SDL_Renderer *global_renderer;
+global_variable SDL_Texture *global_screen;
+global_variable u32 *global_screen_buffer;
+global_variable int global_pitch = SCREEN_WIDTH * sizeof(u32);
+
+global_variable u8 _TETRINO_0[] = {
+    0, 0, 0, 0,
+    1, 1, 1, 1,
+    0, 0, 0, 0,
+    0, 0, 0, 0
+};
+
+global_variable u8 _TETRINO_1[] = {
+    2, 2,
+    2, 2
+};
+
+global_variable u8 _TETRINO_2[] = {
+    0, 0, 0,
+    3, 3, 3,
+    0, 3, 0
+};
+
+global_variable Tetramino global_tetramino_array[] = 
+{
+    { _TETRINO_0, 4 },
+    { _TETRINO_1, 2 },
+    { _TETRINO_2, 3 },
+};
+
+global_variable GameState global_game_state;
+global_variable InputState global_input_state;
+
+global_variable u32 global_colors_base[] = {
+    COLOR(0x28, 0x28, 0x28, 0xFF),
+    COLOR(0x2D, 0x99, 0x99, 0xFF),
+    COLOR(0x99, 0x99, 0x2D, 0xFF),
+    COLOR(0x99, 0x2D, 0x99, 0xFF),
+    COLOR(0x2D, 0x99, 0x51, 0xFF),
+    COLOR(0x99, 0x2D, 0x2D, 0xFF),
+    COLOR(0x2D, 0x63, 0x99, 0xFF),
+    COLOR(0x99, 0x63, 0x2D, 0xFF)};
+
+global_variable u32 global_colors_light[] = {
+    COLOR(0x28, 0x28, 0x28, 0xFF),
+    COLOR(0x44, 0xE5, 0xE5, 0xFF),
+    COLOR(0xE5, 0xE5, 0x44, 0xFF),
+    COLOR(0xE5, 0x44, 0xE5, 0xFF),
+    COLOR(0x44, 0xE5, 0x7A, 0xFF),
+    COLOR(0xE5, 0x44, 0x44, 0xFF),
+    COLOR(0x44, 0x95, 0xE5, 0xFF),
+    COLOR(0xE5, 0x95, 0x44, 0xFF)};
+
+global_variable u32 global_colors_dark[] = {
+    COLOR(0x28, 0x28, 0x28, 0xFF),
+    COLOR(0x1E, 0x66, 0x66, 0xFF),
+    COLOR(0x66, 0x66, 0x1E, 0xFF),
+    COLOR(0x66, 0x1E, 0x66, 0xFF),
+    COLOR(0x1E, 0x66, 0x36, 0xFF),
+    COLOR(0x66, 0x1E, 0x1E, 0xFF),
+    COLOR(0x1E, 0x42, 0x66, 0xFF),
+    COLOR(0x66, 0x42, 0x1E, 0xFF)};
+
 
 internal u8
 tetramino_color_index(Tetramino *tetramino, u8 row, u8 col, u8 rotation)
@@ -104,87 +178,80 @@ tetramino_color_index(Tetramino *tetramino, u8 row, u8 col, u8 rotation)
     return tetramino->shape[t_row * dimension + t_col];
 }
 
-internal void
-update_game_play(GameState *state)
+u8
+update_check_piece_valid_postion(PieceState* piece)
 {
-    state->phase = GAME_STATE_PHASE_PLAY;
+    Tetramino* tetramino = global_tetramino_array + piece->tetramino_index;
+    for (i8 row = 0; row < tetramino->dimension; row++)
+    {
+        for (i8 col = 0; col < tetramino->dimension; col++)
+        {
+            u8 color_index = tetramino_color_index(tetramino, row, col, piece->rotation);
+            if (color_index)
+            {
+                i8 board_row = piece->offset_row + row;
+                i8 board_col = piece->offset_col + col;
+                if (board_col < 0)
+                {
+                    return 0;
+                }
+                if (board_col >= BOARD_WIDTH)
+                {
+                    return 0;
+                }
+                if (board_row < 0)
+                {
+                    return 0;
+                }
+                if (board_row >= BOARD_HEIGHT)
+                {
+                    return 0;
+                }
+                if (global_game_state.board[board_row][board_col])
+                {
+                    return 0;
+                }
+            }
+        }
+    }
+    return 1;
 }
 
 internal void
-update_game(GameState *state)
+update_game_play(void)
 {
-    switch (state->phase)
+    PieceState piece = global_game_state.piece;
+    if (global_input_state.left)
+    {
+        --piece.offset_col;
+    }
+    if (global_input_state.right)
+    {
+        ++piece.offset_col;
+    }
+    if (global_input_state.up)
+    {
+        piece.rotation = (piece.rotation + 1) % 4;
+    }
+
+    if (update_check_piece_valid_postion(&piece)) 
+    {
+        global_game_state.piece = piece;
+    }
+}
+
+internal void
+update_game(void)
+{
+    switch (global_game_state.phase)
     {
     case GAME_STATE_PHASE_PLAY:
     {
-        update_game_play(state);
+        update_game_play();
     }
     break;
     }
 }
-
-global_variable SDL_Window *global_window;
-global_variable SDL_Renderer *global_renderer;
-global_variable SDL_Texture *global_screen;
-global_variable u32 *global_screen_buffer;
-global_variable int global_pitch = SCREEN_WIDTH * sizeof(u32);
-
-global_variable u8 _TETRINO_0[] = {
-    0, 0, 0, 0,
-    1, 1, 1, 1,
-    0, 0, 0, 0,
-    0, 0, 0, 0
-};
-
-global_variable u8 _TETRINO_1[] = {
-    2, 2,
-    2, 2
-};
-
-global_variable u8 _TETRINO_2[] = {
-    0, 0, 0,
-    3, 3, 3,
-    0, 3, 0
-};
-
-global_variable Tetramino global_tetramino_array[] = 
-{
-    { _TETRINO_0, 4 },
-    { _TETRINO_1, 2 },
-    { _TETRINO_2, 3 },
-};
-
-global_variable GameState global_game_state;
-
-global_variable u32 global_colors_base[] = {
-    COLOR(0x28, 0x28, 0x28, 0xFF),
-    COLOR(0x2D, 0x99, 0x99, 0xFF),
-    COLOR(0x99, 0x99, 0x2D, 0xFF),
-    COLOR(0x99, 0x2D, 0x99, 0xFF),
-    COLOR(0x2D, 0x99, 0x51, 0xFF),
-    COLOR(0x99, 0x2D, 0x2D, 0xFF),
-    COLOR(0x2D, 0x63, 0x99, 0xFF),
-    COLOR(0x99, 0x63, 0x2D, 0xFF)};
-
-global_variable u32 global_colors_light[] = {
-    COLOR(0x28, 0x28, 0x28, 0xFF),
-    COLOR(0x44, 0xE5, 0xE5, 0xFF),
-    COLOR(0xE5, 0xE5, 0x44, 0xFF),
-    COLOR(0xE5, 0x44, 0xE5, 0xFF),
-    COLOR(0x44, 0xE5, 0x7A, 0xFF),
-    COLOR(0xE5, 0x44, 0x44, 0xFF),
-    COLOR(0x44, 0x95, 0xE5, 0xFF),
-    COLOR(0xE5, 0x95, 0x44, 0xFF)};
-
-global_variable u32 global_colors_dark[] = {
-    COLOR(0x28, 0x28, 0x28, 0xFF),
-    COLOR(0x1E, 0x66, 0x66, 0xFF),
-    COLOR(0x66, 0x66, 0x1E, 0xFF),
-    COLOR(0x66, 0x1E, 0x66, 0xFF),
-    COLOR(0x1E, 0x66, 0x36, 0xFF),
-    COLOR(0x66, 0x1E, 0x1E, 0xFF),
-    COLOR(0x1E, 0x42, 0x66, 0xFF),
-    COLOR(0x66, 0x42, 0x1E, 0xFF)};
 
 internal void
 cleanup(void)
@@ -250,7 +317,7 @@ buffer_draw_cell(u32 row, u32 col, u8 color_index)
 }
 
 internal void
-buffer_draw_piece(u8 row, u8 col)
+buffer_draw_piece(void)
 {
     PieceState piece = global_game_state.piece;
     Tetramino tetramino = global_tetramino_array[piece.tetramino_index];
@@ -261,7 +328,7 @@ buffer_draw_piece(u8 row, u8 col)
             u8 color_index = tetramino_color_index(&tetramino, y, x, piece.rotation);
             if (color_index)
             {
-                buffer_draw_cell(row + y, col + x, color_index);
+                buffer_draw_cell(piece.offset_row + y, piece.offset_col + x, color_index);
             }
         }
     }
@@ -271,7 +338,6 @@ buffer_draw_piece(u8 row, u8 col)
 int
 main(void)
 {
-
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
         fprintf(stderr, "%s:%d: SDL_Init failed: %s\n",
@@ -331,13 +397,18 @@ main(void)
 
     SDL_Event Event;
     int running = 1;
-    u8 x = 0;
-    u8 y = 0;
 
     global_game_state.piece.tetramino_index = 0;
+    global_game_state.piece.rotation = 0;
+    global_game_state.piece.offset_row = 0;
+    global_game_state.piece.offset_col = 0;
+    srand(0);
 
     while (running)
     {
+        global_input_state.up = 0;
+        global_input_state.left = 0;
+        global_input_state.right = 0;
         while (SDL_PollEvent(&Event))
         {
             if (Event.type == SDL_QUIT)
@@ -346,50 +417,39 @@ main(void)
                 cleanup();
                 return 0;
             }
-            else if (Event.type == SDL_KEYDOWN)
-            {
+			if (Event.type == SDL_KEYDOWN)
+			{
 
-                switch (Event.key.keysym.sym)
-                {
+				switch (Event.key.keysym.sym)
+				{
 
-                case SDLK_ESCAPE:
-                {
+				case SDLK_ESCAPE:
+                    running = 0;
                     cleanup();
-                    return 0;
-                }
-                case SDLK_UP:
-                {
-                    y--;
-                }
-                break;
+					return 0;
 
-                case SDLK_DOWN:
-                {
-                    y++;
-                }
-                break;
+				case SDLK_UP:
+                    global_input_state.up = 1;
+					break;
 
-                case SDLK_LEFT:
-                {
-                    x--;
-                }
-                break;
+				case SDLK_LEFT:
+                    global_input_state.left = 1;
+					break;
 
-                case SDLK_RIGHT:
-                {
-                    x++;
-                }
-                break;
+				case SDLK_RIGHT:
+                    global_input_state.right = 1;
+					break;
 
-                default:
-                    break;
-                }
-            }
+				default:
+					break;
+				}
+			}
         }
+        update_game_play();
 
         // clear buffer
         memset(global_screen_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u32));
-        buffer_draw_piece(y, x);
+        buffer_draw_piece();
         SDL_UpdateTexture(global_screen, 0, global_screen_buffer, global_pitch);
         SDL_RenderClear(global_renderer);
         SDL_RenderCopy(global_renderer, global_screen, 0, 0);
