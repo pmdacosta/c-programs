@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #define global_variable static
 #define internal static
@@ -8,6 +9,7 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+typedef uint64_t u64;
 typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
@@ -17,6 +19,7 @@ typedef double f64;
 #define BOARD_HEIGHT 22
 #define BOARD_WIDTH 10
 #define BOARD_HEIGHT_VISIBLE 20
+#define HEADER_HEIGHT 2
 #define BOARD_GRID_SIZE 30
 
 #define SCREEN_WIDTH 300
@@ -64,7 +67,7 @@ typedef struct
 
 typedef struct
 {
-    u8 board[BOARD_HEIGHT_VISIBLE][BOARD_WIDTH];
+    u8 board[BOARD_HEIGHT][BOARD_WIDTH];
     PieceState piece;
     GameStatePhase phase;
 } GameState;
@@ -80,7 +83,9 @@ global_variable SDL_Window *global_window;
 global_variable SDL_Renderer *global_renderer;
 global_variable SDL_Texture *global_screen;
 global_variable u32 *global_screen_buffer;
-global_variable int global_pitch = SCREEN_WIDTH * sizeof(u32);
+global_variable u32 global_pitch = SCREEN_WIDTH * sizeof(u32);
+global_variable u64 global_frame_counter = 0;
+global_variable u8 global_drop_rate = 48;
 
 global_variable u8 _TETRINO_0[] = {
     0, 0, 0, 0,
@@ -216,6 +221,46 @@ update_check_piece_valid_postion(PieceState* piece)
     }
     return 1;
 }
+internal void
+update_merge_piece_board(void)
+{
+    PieceState piece = global_game_state.piece;
+    Tetramino* tetramino = global_tetramino_array + piece.tetramino_index;
+    for (i8 y = 0; y < tetramino->dimension; y++)
+    {
+        for (i8 x = 0; x < tetramino->dimension; x++) 
+        {
+            u8 color_index = tetramino_color_index(tetramino, y, x, piece.rotation);
+            i8 row = y + piece.offset_row;
+            i8 col = x + piece.offset_col;
+            global_game_state.board[row][col] += color_index;
+        }
+    }
+
+}
+
+internal void
+update_reset_piece(void)
+{
+    global_game_state.piece.tetramino_index = rand() % TETRAMINO_SHAPES_TOTAL;
+    Tetramino* tetramino = global_tetramino_array + global_game_state.piece.tetramino_index;
+    global_game_state.piece.rotation = 0;
+    global_game_state.piece.offset_row = 0;
+    global_game_state.piece.offset_col = (BOARD_WIDTH / 2) - tetramino->dimension / 2;
+}
+
+internal void
+update_soft_drop(void)
+{
+    global_game_state.piece.offset_row++;
+    if (!update_check_piece_valid_postion(&global_game_state.piece))
+    {
+        global_game_state.piece.offset_row--;
+        update_merge_piece_board();
+        update_reset_piece();
+    }
+
+}
 
 internal void
 update_game_play(void)
@@ -238,6 +283,12 @@ update_game_play(void)
     {
         global_game_state.piece = piece;
     }
+
+    if (global_frame_counter % global_drop_rate == 0)
+    {
+        update_soft_drop();
+    }
+
 }
 
 internal void
@@ -301,6 +352,7 @@ buffer_draw_gradient(int x_offset, int y_offset)
 internal void
 buffer_draw_cell(u32 row, u32 col, u8 color_index)
 {
+    row += HEADER_HEIGHT;
     u32 color_base = global_colors_base[color_index];
     u32 color_dark = global_colors_dark[color_index];
     u32 color_light = global_colors_light[color_index];
@@ -332,12 +384,30 @@ buffer_draw_piece(void)
             }
         }
     }
-
 }
+
+internal void
+buffer_draw_board(void)
+{
+    for (u8 y = 2; y < BOARD_HEIGHT; y++)
+    {
+        for (u8 x = 0; x < BOARD_WIDTH; x++) 
+        {
+            u8 color_index = global_game_state.board[y][x];
+            if (color_index)
+            {
+                buffer_draw_cell(y, x, color_index);
+            }
+        }
+    }
+}
+
 
 int
 main(void)
 {
+    srand((i32)time(0));
+
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
         fprintf(stderr, "%s:%d: SDL_Init failed: %s\n",
@@ -395,14 +465,10 @@ main(void)
         return 1;
     }
 
+    update_reset_piece();
+
     SDL_Event Event;
     int running = 1;
-
-    global_game_state.piece.tetramino_index = 0;
-    global_game_state.piece.rotation = 0;
-    global_game_state.piece.offset_row = 0;
-    global_game_state.piece.offset_col = 0;
-    srand(0);
 
     while (running)
     {
@@ -450,11 +516,13 @@ main(void)
         // clear buffer
         memset(global_screen_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u32));
         buffer_draw_piece();
+        buffer_draw_board();
         SDL_UpdateTexture(global_screen, 0, global_screen_buffer, global_pitch);
         SDL_RenderClear(global_renderer);
         SDL_RenderCopy(global_renderer, global_screen, 0, 0);
         SDL_RenderPresent(global_renderer);
         SDL_Delay(16);
+        global_frame_counter++;
     }
 
     cleanup();
