@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CFLAGS='-std=c99 
+CFLAGS='-std=c11 
 -Wall
 -Wextra
 -Werror

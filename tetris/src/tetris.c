@@ -77,7 +77,10 @@ typedef struct
     u8 left;
     u8 right;
     u8 up;
+    u8 down;
 } InputState;
+
+global_variable InputState clear_input_state;
 
 global_variable SDL_Window *global_window;
 global_variable SDL_Renderer *global_renderer;
@@ -259,7 +262,6 @@ update_soft_drop(void)
         update_merge_piece_board();
         update_reset_piece();
     }
-
 }
 
 internal void
@@ -284,6 +286,10 @@ update_game_play(void)
         global_game_state.piece = piece;
     }
 
+    if (global_input_state.down)
+    {
+        update_soft_drop();
+    }
     if (global_frame_counter % global_drop_rate == 0)
     {
         update_soft_drop();
@@ -472,9 +478,7 @@ main(void)
 
     while (running)
     {
-        global_input_state.up = 0;
-        global_input_state.left = 0;
-        global_input_state.right = 0;
+        global_input_state = clear_input_state;
         while (SDL_PollEvent(&Event))
         {
             if (Event.type == SDL_QUIT)
@@ -506,11 +510,16 @@ main(void)
                     global_input_state.right = 1;
 					break;
 
+				case SDLK_DOWN:
+                    global_input_state.down = 1;
+					break;
+
 				default:
 					break;
 				}
 			}
         }
+
         update_game_play();
 
         // clear buffer
