@@ -25,7 +25,7 @@ typedef double f64;
 #define SCREEN_WIDTH 300
 #define SCREEN_HEIGHT 720
 
-#define TETRAMINO_SHAPES_TOTAL 3
+#define ArrayCount(x) (sizeof(x) / sizeof((x)[0]))
 
 // COLOR HELPERS
 // Get individual color values from a 32bit color pixel
@@ -76,8 +76,10 @@ typedef struct
 {
     u8 left;
     u8 right;
-    u8 up;
     u8 down;
+    u8 space;
+    u8 z;
+    u8 x;
 } InputState;
 
 global_variable InputState clear_input_state;
@@ -90,29 +92,58 @@ global_variable u32 global_pitch = SCREEN_WIDTH * sizeof(u32);
 global_variable u64 global_frame_counter = 0;
 global_variable u8 global_drop_rate = 48;
 
-global_variable u8 _TETRINO_0[] = {
+global_variable u8 _TETRAMINO_0[] = {
     0, 0, 0, 0,
     1, 1, 1, 1,
     0, 0, 0, 0,
     0, 0, 0, 0
 };
 
-global_variable u8 _TETRINO_1[] = {
+global_variable u8 _TETRAMINO_1[] = {
     2, 2,
     2, 2
 };
 
-global_variable u8 _TETRINO_2[] = {
+global_variable u8 _TETRAMINO_2[] = {
     0, 0, 0,
     3, 3, 3,
     0, 3, 0
 };
 
+static const u8 _TETRAMINO_3[] = {
+    0, 4, 4,
+    4, 4, 0,
+    0, 0, 0
+};
+
+static const u8 _TETRAMINO_4[] = {
+    5, 5, 0,
+    0, 5, 5,
+    0, 0, 0
+};
+
+static const u8 _TETRAMINO_5[] = {
+    6, 0, 0,
+    6, 6, 6,
+    0, 0, 0
+};
+
+static const u8 _TETRAMINO_6[] = {
+    0, 0, 7,
+    7, 7, 7,
+    0, 0, 0
+};
+
+
 global_variable Tetramino global_tetramino_array[] = 
 {
-    { _TETRINO_0, 4 },
-    { _TETRINO_1, 2 },
-    { _TETRINO_2, 3 },
+    { _TETRAMINO_0, 4 },
+    { _TETRAMINO_1, 2 },
+    { _TETRAMINO_2, 3 },
+    { _TETRAMINO_3, 3 },
+    { _TETRAMINO_4, 3 },
+    { _TETRAMINO_5, 3 },
+    { _TETRAMINO_6, 3 },
 };
 
 global_variable GameState global_game_state;
@@ -245,7 +276,7 @@ update_merge_piece_board(void)
 internal void
 update_reset_piece(void)
 {
-    global_game_state.piece.tetramino_index = rand() % TETRAMINO_SHAPES_TOTAL;
+    global_game_state.piece.tetramino_index = rand() % ArrayCount(global_tetramino_array);
     Tetramino* tetramino = global_tetramino_array + global_game_state.piece.tetramino_index;
     global_game_state.piece.rotation = 0;
     global_game_state.piece.offset_row = 0;
@@ -265,6 +296,18 @@ update_soft_drop(void)
 }
 
 internal void
+update_hard_drop(void)
+{
+    while (update_check_piece_valid_postion(&global_game_state.piece))
+    {
+        global_game_state.piece.offset_row++;
+    }
+    global_game_state.piece.offset_row--;
+    update_merge_piece_board();
+    update_reset_piece();
+}
+
+internal void
 update_game_play(void)
 {
     PieceState piece = global_game_state.piece;
@@ -276,9 +319,13 @@ update_game_play(void)
     {
         ++piece.offset_col;
     }
-    if (global_input_state.up)
+    if (global_input_state.z)
     {
         piece.rotation = (piece.rotation + 1) % 4;
+    }
+    if (global_input_state.x)
+    {
+        piece.rotation = (piece.rotation - 1) % 4;
     }
 
     if (update_check_piece_valid_postion(&piece)) 
@@ -286,6 +333,10 @@ update_game_play(void)
         global_game_state.piece = piece;
     }
 
+    if (global_input_state.space)
+    {
+        update_hard_drop();
+    }
     if (global_input_state.down)
     {
         update_soft_drop();
@@ -395,15 +446,47 @@ buffer_draw_piece(void)
 internal void
 buffer_draw_board(void)
 {
-    for (u8 y = 2; y < BOARD_HEIGHT; y++)
+    for (u8 y = 0; y < BOARD_HEIGHT; y++)
     {
         for (u8 x = 0; x < BOARD_WIDTH; x++) 
         {
             u8 color_index = global_game_state.board[y][x];
-            if (color_index)
-            {
-                buffer_draw_cell(y, x, color_index);
-            }
+            buffer_draw_cell(y, x, color_index);
+        }
+    }
+}
+
+internal void
+buffer_draw_header(void)
+{
+    for (u8 x = 0; x < BOARD_WIDTH; x++) 
+    {
+        buffer_draw_fill_rect(x * BOARD_GRID_SIZE,
+                0 * BOARD_GRID_SIZE,
+                BOARD_GRID_SIZE,
+                BOARD_GRID_SIZE,
+                0x00FF00FF);
+    }
+
+    for (u8 x = 0; x < BOARD_WIDTH; x++) 
+    {
+        buffer_draw_fill_rect(x * BOARD_GRID_SIZE,
+                1 * BOARD_GRID_SIZE,
+                BOARD_GRID_SIZE,
+                BOARD_GRID_SIZE,
+                0xFF0000FF);
+    }
+
+    return;
+    for (u8 y = 0; y < HEADER_HEIGHT ; y++)
+    {
+        for (u8 x = 0; x < BOARD_WIDTH; x++) 
+        {
+            buffer_draw_fill_rect(x * BOARD_GRID_SIZE,
+                                  y * BOARD_GRID_SIZE,
+                                  BOARD_GRID_SIZE,
+                                  BOARD_GRID_SIZE,
+                                  0x00FF00FF);
         }
     }
 }
@@ -498,8 +581,12 @@ main(void)
                     cleanup();
 					return 0;
 
-				case SDLK_UP:
-                    global_input_state.up = 1;
+				case SDLK_z:
+                    global_input_state.z = 1;
+					break;
+
+				case SDLK_x:
+                    global_input_state.x = 1;
 					break;
 
 				case SDLK_LEFT:
@@ -514,6 +601,10 @@ main(void)
                     global_input_state.down = 1;
 					break;
 
+				case SDLK_SPACE:
+                    global_input_state.space = 1;
+					break;
+
 				default:
 					break;
 				}
@@ -524,8 +615,9 @@ main(void)
 
         // clear buffer
         memset(global_screen_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u32));
-        buffer_draw_piece();
         buffer_draw_board();
+        buffer_draw_piece();
+        buffer_draw_header();
         SDL_UpdateTexture(global_screen, 0, global_screen_buffer, global_pitch);
         SDL_RenderClear(global_renderer);
         SDL_RenderCopy(global_renderer, global_screen, 0, 0);
