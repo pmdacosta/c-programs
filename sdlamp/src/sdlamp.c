@@ -18,11 +18,12 @@ global_variable SDL_AudioDeviceID global_audio_device_id = 0;
 global_variable SDL_Window *global_window = 0;
 global_variable SDL_Renderer *global_renderer = 0;
 
-typedef struct {
-    u8 r;
-    u8 g;
-    u8 b;
-} Color;
+global_variable u8* global_wav_buffer = 0;
+global_variable u32 global_wav_buffer_pos = 0;
+global_variable u32 global_wav_len = 0;
+global_variable SDL_AudioSpec global_spec_src;
+global_variable SDL_AudioSpec global_spec_desired;
+global_variable SDL_AudioStream* global_audio_stream;
 
 internal void
 cleanup(void)
@@ -42,21 +43,59 @@ panic_and_abort(char *message, char *sdl_error_msg, char *file, i32 line_number)
     exit(1);
 }
 
+internal u8
+audio_open_file(char* file)
+{
+    SDL_FreeWAV(global_wav_buffer);
+    global_wav_buffer = 0;
+    global_wav_buffer_pos = 0;
+    global_wav_len = 0;
+    SDL_ClearQueuedAudio(global_audio_device_id);
+    SDL_AudioStreamClear(global_audio_stream);
+    SDL_FreeAudioStream(global_audio_stream);
+    global_audio_stream = 0;
+
+    if (!SDL_LoadWAV(file, &global_spec_src, &global_wav_buffer, &global_wav_len))
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
+        return 0;
+    }
+    
+    global_audio_stream = SDL_NewAudioStream(global_spec_src.format,
+                       global_spec_src.channels,
+                       global_spec_src.freq,
+                       global_spec_desired.format,
+                       global_spec_desired.channels,
+                       global_spec_desired.freq);
+    if (!global_audio_stream)
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
+        SDL_FreeWAV(global_wav_buffer);
+        global_wav_buffer = 0;
+        global_wav_buffer_pos = 0;
+        global_wav_len = 0;
+        return 0;
+    }
+
+    if (SDL_AudioStreamPut(global_audio_stream, global_wav_buffer, global_wav_len) == -1) // TODO: graceful handling
+    {
+        panic_and_abort("SDL_AudioStreamPut failed", SDL_GetError(), __FILE__, __LINE__);
+    }
+
+    SDL_AudioStreamFlush(global_audio_stream);
+
+    return 1;
+}
+
 int
 main(void)
 {
-    u8 *wav_buffer = 0;
-    u32 wav_len = 0;
     u8 running = 1;
     u8 audio_paused = 1;
-    u8 click_timer = 0;
-    u8 click_id = 0;
-    SDL_AudioSpec wav_spec;
+    u8 stream_buffer[32 * 1024];
     SDL_Rect rect_rewind = {100, 100, 100, 100};
     SDL_Rect rect_pause = {400, 100, 100, 100};
     SDL_Event event;
-    Color color_bg = {0};
-    Color color_bt = {0xff, 0xff, 0xff};
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
     {
@@ -75,7 +114,25 @@ main(void)
         panic_and_abort("SDL_CreateRenderer failed", SDL_GetError(), __FILE__, __LINE__);
     }
 
+    SDL_zero(global_spec_desired);
+    global_spec_desired.freq = 48000;
+    global_spec_desired.format = AUDIO_F32;
+    global_spec_desired.channels = 2;
+    global_spec_desired.samples = 4096;
+    global_spec_desired.callback = 0;
+
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+    if (!audio_open_file("music.wav"))
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
+    }
+
+
+    global_audio_device_id = SDL_OpenAudioDevice(0, 0, &global_spec_desired, 0, 0);
+    if (!global_audio_device_id)
+    {
+        panic_and_abort("SDL_OpenAudioDevice failed", SDL_GetError(), __FILE__, __LINE__);
+    }
 
     while (running)
     {
@@ -93,22 +150,20 @@ main(void)
             case SDL_MOUSEBUTTONDOWN:
             {
                 SDL_Point pt = {event.button.x, event.button.y};
-                if (global_audio_device_id)
+                if (SDL_PointInRect(&pt, &rect_rewind))
                 {
-                    if (SDL_PointInRect(&pt, &rect_rewind))
+                    SDL_ClearQueuedAudio(global_audio_device_id);
+                    SDL_AudioStreamClear(global_audio_stream);
+                    if (SDL_AudioStreamPut(global_audio_stream, global_wav_buffer, global_wav_len) == -1) // TODO: graceful handling
                     {
-                        SDL_ClearQueuedAudio(global_audio_device_id);
-                        SDL_QueueAudio(global_audio_device_id, wav_buffer, wav_len);
-                        click_id = 0;
-                        click_timer = 20;
+                        panic_and_abort("SDL_AudioStreamPut failed", SDL_GetError(), __FILE__, __LINE__);
                     }
-                    else if (SDL_PointInRect(&pt, &rect_pause))
-                    {
-                        audio_paused = !audio_paused;
-                        SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
-                        click_id = 1;
-                        click_timer = 20;
-                    }
+                    SDL_AudioStreamFlush(global_audio_stream);
+                }
+                else if (SDL_PointInRect(&pt, &rect_pause) && global_audio_device_id)
+                {
+                    audio_paused = !audio_paused;
+                    SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
                 }
                 break;
             }
@@ -116,91 +171,40 @@ main(void)
             case SDL_DROPFILE:
             {
                 audio_paused = 1;
-                if (global_audio_device_id) {
-                    SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
-                    SDL_CloseAudioDevice(global_audio_device_id);
-                    global_audio_device_id = 0;
-                }
-                SDL_FreeWAV(wav_buffer);
-                wav_buffer = 0;
-                wav_len = 0;
-                if (!SDL_LoadWAV(event.drop.file, &wav_spec, &wav_buffer, &wav_len))
+                SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
+                if (!audio_open_file(event.drop.file))
                 {
                     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-                }
-                else
-                {
-                    global_audio_device_id = SDL_OpenAudioDevice(0, 0, &wav_spec, 0, 0);
-                    if (!global_audio_device_id)
-                    {
-                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-                        SDL_FreeWAV(wav_buffer);
-                        wav_buffer = 0;
-                        wav_len = 0;
-                    }
-                    else
-                    {
-                        SDL_QueueAudio(global_audio_device_id, wav_buffer, wav_len);
-                        SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
-                    }
                 }
                 SDL_free(event.drop.file);
                 break;
             }
             }
         }
-
-        if (global_audio_device_id)
+        
+        if (SDL_GetQueuedAudioSize(global_audio_device_id) < 8 * 1024)
         {
-            color_bg.r = 0x77;
-            color_bg.g = 0x00;
-            color_bg.b = 0x00;
-        }
-        else
-        {
-            color_bg.r = 0x55;
-            color_bg.g = 0x00;
-            color_bg.b = 0x00;
-        }
-
-        SDL_SetRenderDrawColor(global_renderer, color_bg.r, color_bg.g, color_bg.r, 255);
-        SDL_RenderClear(global_renderer);
-
-        if (audio_paused) {
-            color_bt.r = 0x00;
-            color_bt.g = 0x00;
-            color_bt.b = 0x77;
-        } else {
-            color_bt.r = 0x00;
-            color_bt.g = 0x77;
-            color_bt.b = 0x00;
-        }
-
-
-        SDL_SetRenderDrawColor(global_renderer, color_bt.r, color_bt.g, color_bt.b, 255);
-        SDL_RenderFillRect(global_renderer, &rect_rewind);
-        SDL_RenderFillRect(global_renderer, &rect_pause);
-
-        Color color_bt_highlight = color_bt;
-        if (click_timer > 0)
-        {
-            click_timer--;
-            color_bt_highlight.r = 0x77;
-            color_bt_highlight.g = 0x00;
-            color_bt_highlight.b = 0x00;
-            SDL_SetRenderDrawColor(global_renderer, color_bt_highlight.r, color_bt_highlight.g, color_bt_highlight.b, 255);
-            if (click_id == 0)
+            u32 bytes_remaining = SDL_AudioStreamAvailable(global_audio_stream);
+            if (bytes_remaining)
             {
-                SDL_RenderFillRect(global_renderer, &rect_rewind);
-            } else {
-                SDL_RenderFillRect(global_renderer, &rect_pause);
+                u32 bytes_load_amount = SDL_min(bytes_remaining, 32 * 1024);
+                SDL_AudioStreamGet(global_audio_stream, &stream_buffer, bytes_load_amount);
+                SDL_QueueAudio(global_audio_device_id, &stream_buffer, bytes_load_amount);
             }
         }
+
+
+        SDL_SetRenderDrawColor(global_renderer, 0x00, 0x77, 0x00, 255);
+        SDL_RenderClear(global_renderer);
+
+        SDL_SetRenderDrawColor(global_renderer, 0xee, 0xee, 0xee, 255);
+        SDL_RenderFillRect(global_renderer, &rect_rewind);
+        SDL_RenderFillRect(global_renderer, &rect_pause);
 
         SDL_RenderPresent(global_renderer);
     }
 
-    SDL_FreeWAV(wav_buffer);
+    SDL_FreeWAV(global_wav_buffer);
     cleanup();
     return 0;
 }
