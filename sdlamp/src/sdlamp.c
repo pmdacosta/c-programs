@@ -109,6 +109,7 @@ main(void)
     u8 stream_buffer[32 * 1024];
     SDL_Rect rect_rewind = {90, 100, 100, 100};
     SDL_Rect rect_pause = {450, 100, 100, 100};
+    SDL_Rect rect_stop = {200, 100, 100, 100};
 
     SDL_Rect rect_volume = {(640 - 500)/2 , 400, 500, 20};
     SDL_Rect rect_volume_knob = {0, 400, 20, 20};
@@ -193,6 +194,13 @@ main(void)
                     audio_paused = !audio_paused;
                     SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
                 }
+                else if (SDL_PointInRect(&pt, &rect_stop) && global_audio_device_id)
+                {
+                    audio_paused = 1;
+                    SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
+                    SDL_ClearQueuedAudio(global_audio_device_id);
+                    audio_cleanup();
+                }
 
                 if (SDL_PointInRect(&pt, &rect_volume) && (event.button.button == SDL_BUTTON_LEFT))
                 {
@@ -205,7 +213,8 @@ main(void)
                 {
                     f32 x_offset = (f32)(pt.x - rect_balance.x);
                     global_audio_balance = (x_offset / (f32)(rect_balance.w));
-                    if (global_audio_balance > 0.996) global_audio_balance = 1.0f;
+                    if (global_audio_balance >= 0.980) global_audio_balance = 1.0f;
+                    else if (global_audio_balance < 0.02) global_audio_balance = 0.0f;
                     rect_balance_knob.x = pt.x - (rect_balance_knob.w / 2);
                 }
                 break;
@@ -225,7 +234,8 @@ main(void)
                 {
                     f32 x_offset = (f32)(pt.x - rect_balance.x);
                     global_audio_balance = (x_offset / (f32)(rect_balance.w));
-                    if (global_audio_balance > 0.996) global_audio_balance = 1.0f;
+                    if (global_audio_balance >= 0.980) global_audio_balance = 1.0f;
+                    else if (global_audio_balance < 0.02) global_audio_balance = 0.0f;
                     rect_balance_knob.x = pt.x - (rect_balance_knob.w / 2);
                 }
                 break;
@@ -256,24 +266,24 @@ main(void)
             if (bytes_remaining)
             {
                 u32 bytes_load_amount = SDL_min(bytes_remaining, 32 * 1024);
-                SDL_AudioStreamGet(global_audio_stream, &stream_buffer, bytes_load_amount);
+                u32 stream_buffer_bytes = SDL_AudioStreamGet(global_audio_stream, &stream_buffer, bytes_load_amount);
                 f32* samples = (f32*) stream_buffer;
                 u32 num_samples = bytes_load_amount / sizeof (f32);
-                for (u32 i = 0; i < num_samples; i++)
+                if (global_audio_balance > 0.5f)
                 {
-                    samples[i] *= global_audio_volume;
-                    if (i % 2 == 0)
+                    for (u32 i = 0; i < num_samples; i+=2)
                     {
-                        // left channel
-                        samples[i] *= 1.0f - global_audio_balance;
-                    }
-                    else
-                    {
-                        // right channel
-                        samples[i] *= global_audio_balance;
+                        samples[i] *= 2 * (1.0f - global_audio_balance);
                     }
                 }
-                SDL_QueueAudio(global_audio_device_id, &stream_buffer, bytes_load_amount);
+                else if (global_audio_balance < 0.5f)
+                {
+                    for (u32 i = 0; i < num_samples; i+=2)
+                    {
+                        samples[i+1] *= 2 * global_audio_balance;
+                    }
+                }
+                SDL_QueueAudio(global_audio_device_id, &stream_buffer, stream_buffer_bytes);
             }
         }
 
@@ -284,6 +294,7 @@ main(void)
         SDL_SetRenderDrawColor(global_renderer, 0xee, 0xee, 0xee, 255);
         SDL_RenderFillRect(global_renderer, &rect_rewind);
         SDL_RenderFillRect(global_renderer, &rect_pause);
+        SDL_RenderFillRect(global_renderer, &rect_stop);
         SDL_RenderFillRect(global_renderer, &rect_volume);
         SDL_RenderFillRect(global_renderer, &rect_balance);
 
