@@ -14,8 +14,8 @@ typedef float f32;
 typedef double f64;
 
 global_variable SDL_AudioDeviceID global_audio_device_id = 0;
-global_variable SDL_Window *global_window = 0;
-global_variable SDL_Renderer *global_renderer = 0;
+global_variable SDL_Window* global_window = 0;
+global_variable SDL_Renderer* global_renderer = 0;
 
 global_variable u8* global_wav_buffer = 0;
 global_variable u32 global_wav_buffer_pos = 0;
@@ -101,15 +101,34 @@ failed:
     return 0;
 }
 
+// returns 0 on failure
+SDL_Texture* texture_load(char *file)
+{
+    SDL_Surface* surface = SDL_LoadBMP(file);
+    if (!surface)
+    {
+        return 0;
+    }
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(global_renderer, surface);
+    SDL_FreeSurface(surface);
+    return texture;
+}
+
 int
 main(void)
 {
     u8 running = 1;
     u8 audio_paused = 1;
     u8 stream_buffer[32 * 1024];
-    SDL_Rect rect_rewind = {90, 100, 100, 100};
-    SDL_Rect rect_pause = {450, 100, 100, 100};
-    SDL_Rect rect_stop = {200, 100, 100, 100};
+    SDL_Rect rect_rewind = {16, 88, 23, 18};
+    SDL_Rect rect_play = {39, 88, 23, 18};
+    SDL_Rect rect_pause = {62, 88, 23, 18};
+
+    SDL_Rect rect_cbutton_pause = {46, 0, 23, 18};
+    SDL_Rect rect_cbutton_pause_pressed = {46, 18, 23, 18};
+
+    SDL_Rect rect_stop = {85, 88, 23, 18};
 
     SDL_Rect rect_volume = {(640 - 500)/2 , 400, 500, 20};
     SDL_Rect rect_volume_knob = {0, 400, 20, 20};
@@ -119,6 +138,8 @@ main(void)
     SDL_Rect rect_balance_knob = {0, 300, 20, 20};
     rect_balance_knob.x = rect_balance.x + (rect_balance.w - rect_balance_knob.w)/2;
 
+    u8 cbutton_pause_pressed = 0;
+
     SDL_Event event;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
@@ -126,7 +147,7 @@ main(void)
         panic_and_abort("SDL_Init failed", SDL_GetError(), __FILE__, __LINE__);
     }
 
-    global_window = SDL_CreateWindow("sdlamp", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
+    global_window = SDL_CreateWindow("sdlamp", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 275, 116, 0);
     if (!global_window)
     {
         panic_and_abort("SDL_CreateWindow failed", SDL_GetError(), __FILE__, __LINE__);
@@ -136,6 +157,18 @@ main(void)
     if (!global_renderer)
     {
         panic_and_abort("SDL_CreateRenderer failed", SDL_GetError(), __FILE__, __LINE__);
+    }
+
+    SDL_Texture* skin_main = texture_load("skins/classic/Main.bmp");
+    if (!skin_main)
+    {
+        panic_and_abort("texture_load failed", SDL_GetError(), __FILE__, __LINE__);
+    }
+
+    SDL_Texture* skin_cbuttons = texture_load("skins/classic/Cbuttons.bmp");
+    if (!skin_cbuttons)
+    {
+        panic_and_abort("texture_load failed", SDL_GetError(), __FILE__, __LINE__);
     }
 
     SDL_zero(global_spec_desired);
@@ -171,6 +204,7 @@ main(void)
                 exit(0);
             }
 
+            case SDL_MOUSEBUTTONUP:
             case SDL_MOUSEBUTTONDOWN:
             {
                 SDL_Point pt = {event.button.x, event.button.y};
@@ -191,7 +225,16 @@ main(void)
                 }
                 else if (SDL_PointInRect(&pt, &rect_pause) && global_audio_device_id)
                 {
-                    audio_paused = !audio_paused;
+                    cbutton_pause_pressed = event.button.state;
+                    if (event.button.state)
+                    {
+                        audio_paused = 1;
+                        SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
+                    }
+                }
+                else if (SDL_PointInRect(&pt, &rect_play) && global_audio_device_id)
+                {
+                    audio_paused = 0;
                     SDL_PauseAudioDevice(global_audio_device_id, audio_paused);
                 }
                 else if (SDL_PointInRect(&pt, &rect_stop) && global_audio_device_id)
@@ -288,20 +331,12 @@ main(void)
         }
 
 
-        SDL_SetRenderDrawColor(global_renderer, 0x00, 0x77, 0x00, 255);
+        // SDL_SetRenderDrawColor(global_renderer, 0x00, 0x77, 0x00, 255);
         SDL_RenderClear(global_renderer);
+        SDL_RenderCopy(global_renderer, skin_main, 0, 0);
+        SDL_Rect* rect_src_cbutton = cbutton_pause_pressed ? &rect_cbutton_pause_pressed : &rect_cbutton_pause;
+        SDL_RenderCopy(global_renderer, skin_cbuttons, rect_src_cbutton, &rect_pause);
 
-        SDL_SetRenderDrawColor(global_renderer, 0xee, 0xee, 0xee, 255);
-        SDL_RenderFillRect(global_renderer, &rect_rewind);
-        SDL_RenderFillRect(global_renderer, &rect_pause);
-        SDL_RenderFillRect(global_renderer, &rect_stop);
-        SDL_RenderFillRect(global_renderer, &rect_volume);
-        SDL_RenderFillRect(global_renderer, &rect_balance);
-
-        SDL_SetRenderDrawColor(global_renderer, 0x00, 0x00, 0x00, 255);
-
-        SDL_RenderFillRect(global_renderer, &rect_volume_knob);
-        SDL_RenderFillRect(global_renderer, &rect_balance_knob);
 
         SDL_RenderPresent(global_renderer);
         SDL_Delay(16);
