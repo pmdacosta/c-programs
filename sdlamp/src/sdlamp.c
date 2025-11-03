@@ -15,7 +15,6 @@ typedef double f64;
 
 typedef struct
 {
-    SDL_Texture *texture;
     SDL_Rect src_rect_unpressed;
     SDL_Rect src_rect_pressed;
     SDL_Rect dest_rect;
@@ -161,7 +160,6 @@ skin_load(char* path)
     for (u8 button_id = 0; button_id < BTN_NEXT; button_id++)
     {
         Cbutton *button = global_skin.buttons + button_id;
-        button->texture = global_skin.cbuttons;
         button->src_rect_unpressed.w = width;
         button->src_rect_unpressed.h = height;
         button->src_rect_unpressed.x = button_id * width;
@@ -181,7 +179,6 @@ skin_load(char* path)
     {
         u8 button_id = BTN_NEXT;
         Cbutton *button = global_skin.buttons + button_id;
-        button->texture = global_skin.cbuttons;
         button->src_rect_unpressed.h = height;
         button->src_rect_unpressed.x = button_id * width;
         button->src_rect_unpressed.y = 0;
@@ -204,7 +201,6 @@ skin_load(char* path)
         width = 22;
         height = 16;
         Cbutton *button = global_skin.buttons + BTN_EJECT;
-        button->texture = global_skin.cbuttons;
         button->src_rect_unpressed.w = width;
         button->src_rect_unpressed.h = height;
         button->src_rect_unpressed.x = 114;
@@ -226,23 +222,7 @@ main(void)
 {
     u8 running = 1;
     u8 audio_paused = 1;
-    u8 stream_buffer[32 * 1024];
-    SDL_Rect rect_rewind = {16, 88, 23, 18};
-    SDL_Rect rect_play = {39, 88, 23, 18};
-    SDL_Rect rect_pause = {62, 88, 23, 18};
-
-    SDL_Rect rect_cbutton_pause = {46, 0, 23, 18};
-    SDL_Rect rect_cbutton_pause_pressed = {46, 18, 23, 18};
-
-    SDL_Rect rect_stop = {85, 88, 23, 18};
-
-    SDL_Rect rect_volume = {(640 - 500) / 2, 400, 500, 20};
-    SDL_Rect rect_volume_knob = {0, 400, 20, 20};
-    rect_volume_knob.x = rect_volume.x + rect_volume.w - rect_volume_knob.w;
-
-    SDL_Rect rect_balance = {(640 - 500) / 2, 300, 500, 20};
-    SDL_Rect rect_balance_knob = {0, 300, 20, 20};
-    rect_balance_knob.x = rect_balance.x + (rect_balance.w - rect_balance_knob.w) / 2;
+    static u8 stream_buffer[32 * 1024];
 
     SDL_Event event;
 
@@ -345,6 +325,7 @@ main(void)
                     audio_cleanup();
                 }
 
+#if 0
                 if (SDL_PointInRect(&pt, &rect_volume) && (event.button.button == SDL_BUTTON_LEFT))
                 {
                     f32 x_offset = (f32)(pt.x - rect_volume.x);
@@ -363,11 +344,13 @@ main(void)
                         global_audio_balance = 0.0f;
                     rect_balance_knob.x = pt.x - (rect_balance_knob.w / 2);
                 }
+#endif
                 break;
             }
 
             case SDL_MOUSEMOTION:
             {
+#if 0
                 SDL_Point pt = {event.motion.x, event.motion.y};
                 if (SDL_PointInRect(&pt, &rect_volume) && (event.motion.state & SDL_BUTTON_LMASK))
                 {
@@ -387,6 +370,7 @@ main(void)
                         global_audio_balance = 0.0f;
                     rect_balance_knob.x = pt.x - (rect_balance_knob.w / 2);
                 }
+#endif
                 break;
             }
 
@@ -402,10 +386,13 @@ main(void)
                 break;
             }
             }
+
+#if 0
             rect_volume_knob.x = SDL_max(rect_volume_knob.x, rect_volume.x);
             rect_volume_knob.x = SDL_min(rect_volume_knob.x, rect_volume.x + rect_volume.w - rect_volume_knob.w);
             rect_balance_knob.x = SDL_max(rect_balance_knob.x, rect_balance.x);
             rect_balance_knob.x = SDL_min(rect_balance_knob.x, rect_balance.x + rect_balance.w - rect_balance_knob.w);
+#endif
         }
 
         if (SDL_GetQueuedAudioSize(global_audio_device_id) < 8 * 1024)
@@ -435,7 +422,7 @@ main(void)
             }
         }
 
-        // SDL_SetRenderDrawColor(global_renderer, 0x00, 0x77, 0x00, 255);
+        SDL_SetRenderDrawColor(global_renderer, 0x00, 0x00, 0x00, 255);
         SDL_RenderClear(global_renderer);
         SDL_RenderCopy(global_renderer, global_skin.main, 0, 0);
         for (u8 button_id = 0; button_id < BTN_TOTAL; button_id++)
