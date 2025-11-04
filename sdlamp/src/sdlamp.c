@@ -1,477 +1,387 @@
+#include <stdio.h>
 #include "SDL.h"
-
-#define global_variable static
-#define internal static
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-typedef int8_t i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef float f32;
-typedef double f64;
 
 typedef struct
 {
-    SDL_Rect src_rect_unpressed;
-    SDL_Rect src_rect_pressed;
-    SDL_Rect dest_rect;
-    u8 pressed;
-} Cbutton;
+    SDL_Texture *texture;  // YOU DO NOT OWN THIS POINTER, DON'T FREE IT.
+    SDL_Rect srcrect_unpressed;
+    SDL_Rect srcrect_pressed;
+    SDL_Rect dstrect;
+    SDL_bool pressed;
+} WinAmpSkinButton;
 
 typedef enum
 {
-    BTN_PREV,
-    BTN_PLAY,
-    BTN_PAUSE,
-    BTN_STOP,
-    BTN_NEXT,
-    BTN_EJECT,
-    BTN_TOTAL
-} ButtonID;
+    WASBTN_PREV=0,
+    WASBTN_PLAY,
+    WASBTN_PAUSE,
+    WASBTN_STOP,
+    WASBTN_NEXT,
+    WASBTN_EJECT,
+    WASBTN_TOTAL
+} WinAmpSkinButtonId;
 
 typedef struct
 {
-    SDL_Texture *main;
-    SDL_Texture *cbuttons;
-    Cbutton buttons[BTN_TOTAL];
-} Skin;
+    SDL_Texture *tex_main;
+    SDL_Texture *tex_cbuttons;
+    WinAmpSkinButton buttons[WASBTN_TOTAL];
+} WinAmpSkin;
 
-global_variable SDL_AudioDeviceID global_audio_device = 0;
-global_variable SDL_Window *global_window = 0;
-global_variable SDL_Renderer *global_renderer = 0;
+static SDL_AudioDeviceID audio_device = 0;
+static SDL_Window *window = NULL;
+static SDL_Renderer *renderer = NULL;
 
-global_variable u8 *global_wav_buffer = 0;
-global_variable u32 global_wav_len = 0;
-global_variable f32 global_audio_volume = 1.0f;
-global_variable f32 global_audio_balance = 0.5f;
-global_variable SDL_AudioSpec global_spec_src;
-global_variable SDL_AudioSpec global_spec_desired;
-global_variable SDL_AudioStream *global_audio_stream;
-global_variable Skin global_skin;
+#if defined(__GNUC__) || defined(__clang__)
+static void panic_and_abort(const char *title, const char *text) __attribute__((noreturn));
+#endif
 
-internal void
-audio_cleanup(void)
+static void panic_and_abort(const char *title, const char *text)
 {
-    if (global_audio_stream)
-    {
-        SDL_LockAudioDevice(global_audio_device);
-        SDL_FreeAudioStream(global_audio_stream);
-        SDL_AtomicSetPtr((void **)&global_audio_stream, 0);
-        SDL_UnlockAudioDevice(global_audio_device);
-    }
-
-    if (global_wav_buffer)
-    {
-        SDL_FreeWAV(global_wav_buffer);
-        global_wav_buffer = 0;
-        global_wav_len = 0;
-    }
-}
-
-internal void
-cleanup(void)
-{
-    SDL_FreeWAV(global_wav_buffer);
-    SDL_CloseAudioDevice(global_audio_device);
-    SDL_DestroyWindow(global_window);
-    SDL_DestroyRenderer(global_renderer);
+    fprintf(stderr, "PANIC: %s ... %s\n", title, text);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, text, window);
     SDL_Quit();
-}
-
-internal void
-panic_and_abort(char *message, char *sdl_error_msg, char *file, i32 line_number)
-{
-    fprintf(stderr, "%s:%d: %s: %s\n", file, line_number, message, sdl_error_msg);
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, message, sdl_error_msg, global_window);
-    cleanup();
     exit(1);
 }
 
-// returns 1 (TRUE) on success
-// retruns 0 (FALSE) on failure
-internal u8
-audio_open_file(char *file)
+static WinAmpSkin skin;
+static float volume_slider_value = 1.0f;
+static float balance_slider_value = 0.5f;
+
+static Uint8 *wavbuf = NULL;
+static Uint32 wavlen = 0;
+static SDL_AudioSpec wavspec;
+static SDL_AudioStream *stream = NULL;
+
+static void SDLCALL feed_audio_device_callback(void *userdata, Uint8 *output_stream, int len)
 {
-    SDL_AudioStream *local_audio_stream = global_audio_stream;
+    SDL_AudioStream *input_stream = (SDL_AudioStream *) SDL_AtomicGetPtr((void **) &stream);
 
-    SDL_LockAudioDevice(global_audio_device);
-    SDL_AtomicSetPtr((void **)&global_audio_stream, 0);
-    SDL_UnlockAudioDevice(global_audio_device);
-
-    SDL_FreeAudioStream(local_audio_stream);
-
-    SDL_FreeWAV(global_wav_buffer);
-    global_wav_buffer = 0;
-    global_wav_len = 0;
-
-    SDL_ClearQueuedAudio(global_audio_device);
-    SDL_AudioStreamClear(local_audio_stream);
-
-    if (!SDL_LoadWAV(file, &global_spec_src, &global_wav_buffer, &global_wav_len))
-    {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-        goto failed;
-    }
-
-    local_audio_stream = SDL_NewAudioStream(global_spec_src.format, global_spec_src.channels, global_spec_src.freq, global_spec_desired.format, global_spec_desired.channels, global_spec_desired.freq);
-    if (!local_audio_stream)
-    {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-        goto failed;
-    }
-
-    if (SDL_AudioStreamPut(local_audio_stream, global_wav_buffer, global_wav_len) == -1) // TODO: graceful handling
-    {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-        goto failed;
-    }
-
-    if (SDL_AudioStreamFlush(local_audio_stream) == -1)
-    {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-        goto failed;
-    }
-
-    SDL_LockAudioDevice(global_audio_device);
-    SDL_AtomicSetPtr((void **)&global_audio_stream, local_audio_stream);
-    SDL_UnlockAudioDevice(global_audio_device);
-
-    return 1;
-
-failed:
-    audio_cleanup();
-    return 0;
-}
-
-// returns 0 on failure
-internal SDL_Texture *
-texture_load(char *file)
-{
-    SDL_Surface *surface = SDL_LoadBMP(file);
-    if (!surface)
-    {
-        return 0;
-    }
-
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(global_renderer, surface);
-    SDL_FreeSurface(surface);
-    return texture;
-}
-
-internal void
-skin_load(char *path)
-{
-    char file[100];
-
-    sprintf(file, "%s/%s", path, "Main.bmp");
-    global_skin.main = texture_load(file);
-
-    sprintf(file, "%s/%s", path, "Cbuttons.bmp");
-    global_skin.cbuttons = texture_load(file);
-
-    u8 width = 23;
-    u8 height = 18;
-    u8 offset_x = 16;
-    u8 offset_y = 88;
-    for (u8 button_id = 0; button_id < BTN_NEXT; button_id++)
-    {
-        Cbutton *button = global_skin.buttons + button_id;
-        button->src_rect_unpressed.w = width;
-        button->src_rect_unpressed.h = height;
-        button->src_rect_unpressed.x = button_id * width;
-        button->src_rect_unpressed.y = 0;
-        button->src_rect_pressed.w = width;
-        button->src_rect_pressed.h = height;
-        button->src_rect_pressed.x = button_id * width;
-        button->src_rect_pressed.y = height;
-        button->dest_rect.w = width;
-        button->dest_rect.h = height;
-        button->dest_rect.x = offset_x + button_id * width;
-        button->dest_rect.y = offset_y;
-        button->pressed = 0;
-    }
-
-    // NEXT BUTTON
-    {
-        u8 button_id = BTN_NEXT;
-        Cbutton *button = global_skin.buttons + button_id;
-        button->src_rect_unpressed.h = height;
-        button->src_rect_unpressed.x = button_id * width;
-        button->src_rect_unpressed.y = 0;
-        button->src_rect_pressed.h = height;
-        button->src_rect_pressed.x = button_id * width;
-        button->src_rect_pressed.y = height;
-        button->dest_rect.h = height;
-        button->dest_rect.x = offset_x + button_id * width;
-        button->dest_rect.y = offset_y;
-        button->pressed = 0;
-
-        width = 22;
-        button->src_rect_pressed.w = width;
-        button->dest_rect.w = width;
-        button->src_rect_unpressed.w = width;
-    }
-
-    // EJECT BUTTON
-    {
-        width = 22;
-        height = 16;
-        Cbutton *button = global_skin.buttons + BTN_EJECT;
-        button->src_rect_unpressed.w = width;
-        button->src_rect_unpressed.h = height;
-        button->src_rect_unpressed.x = 114;
-        button->src_rect_unpressed.y = 0;
-        button->src_rect_pressed.w = width;
-        button->src_rect_pressed.h = height;
-        button->src_rect_pressed.x = 114;
-        button->src_rect_pressed.y = height;
-        button->dest_rect.w = width;
-        button->dest_rect.h = height;
-        button->dest_rect.x = 136;
-        button->dest_rect.y = 89;
-        button->pressed = 0;
-    }
-}
-
-internal void SDLCALL
-callback_feed_audio_device(void *userdata, u8 *output_stream, int len)
-{
-    SDL_AudioStream *input_stream = (SDL_AudioStream *) SDL_AtomicGetPtr((void **) &global_audio_stream);
-    if (!input_stream)
-    {
-        memset(output_stream, 0, len);
+    if (input_stream == NULL) {  // nothing playing, just write silence and bail.
+        SDL_memset(output_stream, '\0', len);
         return;
     }
 
-    u32 bytes_read = SDL_AudioStreamGet(input_stream, output_stream, len);
-    if (bytes_read)
-    {
-        u32 num_samples = bytes_read / sizeof(f32);
-        f32 *samples = (f32 *)output_stream;
+    const int num_converted_bytes = SDL_AudioStreamGet(input_stream, output_stream, len);
+    if (num_converted_bytes > 0) {
+        const int num_samples = (num_converted_bytes / sizeof (float));
+        float *samples = (float *) output_stream;
 
-        if (global_audio_volume != 1.0f)
-        {
-            for (u32 i = 0; i < num_samples; i++)
-            {
-                samples[i] *= global_audio_volume;
+        SDL_assert((num_samples % 2) == 0);  // this should always be stereo data (at least for now).
+
+        // change the volume of the audio we're playing.
+        if (volume_slider_value != 1.0f) {
+            for (int i = 0; i < num_samples; i++) {
+                samples[i] *= volume_slider_value;
             }
         }
 
-        if (global_audio_balance > 0.5f)
-        {
-            for (u32 i = 0; i < num_samples; i += 2)
-            {
-                samples[i] *= 2 * (1.0f - global_audio_balance);
+        // first sample is left, second is right.
+        // change the balance of the audio we're playing.
+        if (balance_slider_value > 0.5f) {
+            for (int i = 0; i < num_samples; i += 2) {
+                samples[i] *= 1.0f - balance_slider_value;
             }
-        }
-        else if (global_audio_balance < 0.5f)
-        {
-            for (u32 i = 0; i < num_samples; i += 2)
-            {
-                samples[i + 1] *= 2 * global_audio_balance;
+        } else if (balance_slider_value < 0.5f) {
+            for (int i = 0; i < num_samples; i += 2) {
+                samples[i+1] *= balance_slider_value;
             }
         }
     }
 
-    len -= bytes_read;
-    output_stream += bytes_read;
-    memset(output_stream, 0, len);
+    len -= num_converted_bytes;  // now has number of bytes left after feeding the device.
+    output_stream += num_converted_bytes;
+    if (len > 0) {
+        SDL_memset(output_stream, '\0', len);
+    }
 }
 
-int
-main(void)
+static void stop_audio(void)
 {
-    u8 running = 1;
-    u8 audio_paused = 1;
-    static u8 stream_buffer[32 * 1024];
+    SDL_LockAudioDevice(audio_device);
+    if (stream) {
+        SDL_FreeAudioStream(stream);
+        SDL_AtomicSetPtr((void **) &stream, NULL);
+    }
+    SDL_UnlockAudioDevice(audio_device);
 
-    SDL_Event event;
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
-    {
-        panic_and_abort("SDL_Init failed", SDL_GetError(), __FILE__, __LINE__);
+    if (wavbuf) {
+        SDL_FreeWAV(wavbuf);
     }
 
-    global_window = SDL_CreateWindow("sdlamp", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 275, 116, 0);
-    if (!global_window)
-    {
-        panic_and_abort("SDL_CreateWindow failed", SDL_GetError(), __FILE__, __LINE__);
+    wavbuf = NULL;
+    wavlen = 0;
+}
+
+static SDL_bool open_new_audio_file(const char *fname)
+{
+    SDL_AudioStream *tmpstream = stream;
+
+    // make sure the audio callback can't touch `stream` while we're freeing it.
+    SDL_LockAudioDevice(audio_device);
+    SDL_AtomicSetPtr((void **) &stream, NULL);
+    SDL_UnlockAudioDevice(audio_device);
+
+    SDL_FreeAudioStream(tmpstream);
+    SDL_FreeWAV(wavbuf);
+    wavbuf = NULL;
+    wavlen = 0;
+
+    if (SDL_LoadWAV(fname, &wavspec, &wavbuf, &wavlen) == NULL) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Couldn't load wav file!", SDL_GetError(), window);
+        goto failed;
     }
 
-    global_renderer = SDL_CreateRenderer(global_window, -1, SDL_RENDERER_PRESENTVSYNC);
-    if (!global_renderer)
-    {
-        panic_and_abort("SDL_CreateRenderer failed", SDL_GetError(), __FILE__, __LINE__);
+    tmpstream = SDL_NewAudioStream(wavspec.format, wavspec.channels, wavspec.freq, AUDIO_F32, 2, 48000);
+    if (!tmpstream) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Couldn't create audio stream!", SDL_GetError(), window);
+        goto failed;
     }
 
-    skin_load("skins/classic");
-
-    SDL_zero(global_spec_desired);
-    global_spec_desired.freq = 48000;
-    global_spec_desired.format = AUDIO_F32;
-    global_spec_desired.channels = 2;
-    global_spec_desired.samples = 4096;
-    global_spec_desired.callback = callback_feed_audio_device;
-
-    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
-    if (!audio_open_file("music.wav"))
-    {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
+    if (SDL_AudioStreamPut(tmpstream, wavbuf, wavlen) == -1) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Audio stream put failed", SDL_GetError(), window);
+        goto failed;
     }
 
-    global_audio_device = SDL_OpenAudioDevice(0, 0, &global_spec_desired, 0, 0);
-    if (!global_audio_device)
-    {
-        panic_and_abort("SDL_OpenAudioDevice failed", SDL_GetError(), __FILE__, __LINE__);
+    if (SDL_AudioStreamFlush(tmpstream) == -1) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Audio stream flush failed", SDL_GetError(), window);
+        goto failed;
     }
 
-    while (running)
-    {
-        while (SDL_PollEvent(&event))
-        {
-            switch (event.type)
-            {
+    // make new `stream` available to the audio callback thread.
+    SDL_LockAudioDevice(audio_device);
+    SDL_AtomicSetPtr((void **) &stream, tmpstream);
+    SDL_UnlockAudioDevice(audio_device);
 
+    return SDL_TRUE;
+
+failed:
+    stop_audio();
+    return SDL_FALSE;
+}
+
+static SDL_Texture *load_texture(const char *fname)
+{
+    SDL_Surface *surface = SDL_LoadBMP(fname);
+    if (!surface) {
+        return NULL;
+    }
+
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_FreeSurface(surface);
+    return texture;  // MAY BE NULL.
+}
+
+
+static SDL_INLINE void init_skin_button(WinAmpSkinButton *btn, SDL_Texture *tex,
+                                        const int w, const int h,
+                                        const int dx, const int dy,
+                                        const int sxu, const int syu,
+                                        const int sxp, const int syp)
+{
+    btn->texture = tex;
+    btn->srcrect_unpressed.x = sxu;
+    btn->srcrect_unpressed.y = syu;
+    btn->srcrect_unpressed.w = w;
+    btn->srcrect_unpressed.h = h;
+    btn->srcrect_pressed.x = sxp;
+    btn->srcrect_pressed.y = syp;
+    btn->srcrect_pressed.w = w;
+    btn->srcrect_pressed.h = h;
+    btn->dstrect.x = dx;
+    btn->dstrect.y = dy;
+    btn->dstrect.w = w;
+    btn->dstrect.h = h;
+    btn->pressed = SDL_FALSE;
+}
+
+static SDL_bool load_skin(WinAmpSkin *skin, const char *fname)  // !!! FIXME: use this variable
+{
+    SDL_zerop(skin);
+
+    skin->tex_main = load_texture("skins/hifi/Main.bmp");  // !!! FIXME: hardcoded
+    skin->tex_cbuttons = load_texture("skins/hifi/Cbuttons.bmp"); // !!! FIXME: hardcoded
+
+    init_skin_button(&skin->buttons[WASBTN_PREV], skin->tex_cbuttons, 23, 18, 16, 88, 0, 0, 0, 18);
+    init_skin_button(&skin->buttons[WASBTN_PLAY], skin->tex_cbuttons, 23, 18, 39, 88, 23, 0, 23, 18);
+    init_skin_button(&skin->buttons[WASBTN_PAUSE], skin->tex_cbuttons, 23, 18, 62, 88, 46, 0, 46, 18);
+    init_skin_button(&skin->buttons[WASBTN_STOP], skin->tex_cbuttons, 23, 18, 85, 88, 69, 0, 69, 18);
+    init_skin_button(&skin->buttons[WASBTN_NEXT], skin->tex_cbuttons, 22, 18, 108, 88, 92, 0, 92, 18);
+    init_skin_button(&skin->buttons[WASBTN_EJECT], skin->tex_cbuttons, 22, 16, 136, 89, 114, 0, 114, 16);
+
+    return SDL_TRUE;
+}
+
+static void init_everything(int argc, char **argv)
+{
+    SDL_AudioSpec desired;
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1) {
+        panic_and_abort("SDL_Init failed", SDL_GetError());
+    }
+
+    window = SDL_CreateWindow("Hello SDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 275, 116, 0);
+    if (!window) {
+        panic_and_abort("SDL_CreateWindow failed", SDL_GetError());
+    }
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer) {
+        panic_and_abort("SDL_CreateRenderer failed", SDL_GetError());
+    }
+
+    if (!load_skin(&skin, "")) {  // !!! FIXME: load a real thing, not an empty string
+        panic_and_abort("Failed to load initial skin", SDL_GetError());
+    }
+
+    SDL_zero(desired);
+    desired.freq = 48000;
+    desired.format = AUDIO_F32;
+    desired.channels = 2;
+    desired.samples = 4096;
+    desired.callback = feed_audio_device_callback;
+
+    audio_device = SDL_OpenAudioDevice(NULL, 0, &desired, NULL, 0);
+    if (audio_device == 0) {
+        panic_and_abort("Couldn't audio device!", SDL_GetError());
+    }
+
+    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);  // tell SDL we want this event that is disabled by default.
+
+    open_new_audio_file("music.wav");
+}
+
+static void draw_button(SDL_Renderer *renderer, WinAmpSkinButton *btn)
+{
+    const SDL_bool pressed = btn->pressed;
+    if (btn->texture == NULL) {
+        if (pressed) {
+            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+        } else {
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        }
+        SDL_RenderFillRect(renderer, &btn->dstrect);
+    } else {
+        SDL_RenderCopy(renderer, btn->texture, pressed ? &btn->srcrect_pressed : &btn->srcrect_unpressed, &btn->dstrect);
+    }
+}
+
+static void draw_frame(SDL_Renderer *renderer, WinAmpSkin *skin)
+{
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_RenderCopy(renderer, skin->tex_main, NULL, NULL);
+
+    for (unsigned long i = 0; i < SDL_arraysize(skin->buttons); i++) {
+        draw_button(renderer, &skin->buttons[i]);
+    }
+
+    SDL_RenderPresent(renderer);
+}
+
+static void deinit_everything(void)
+{
+    // !!! FIXME: free_skin()
+    SDL_FreeWAV(wavbuf);
+    SDL_CloseAudioDevice(audio_device);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+}
+
+static SDL_bool paused = SDL_TRUE;  // !!! FIXME: move this later.
+
+static SDL_bool handle_events(WinAmpSkin *skin)
+{
+    SDL_Event e;
+    while (SDL_PollEvent(&e)) {
+        switch (e.type) {
             case SDL_QUIT:
-            {
-                cleanup();
-                exit(0);
-            }
+                return SDL_FALSE;  // don't keep going.
 
             case SDL_MOUSEBUTTONUP:
-            case SDL_MOUSEBUTTONDOWN:
-            {
-                SDL_Point pt = {event.button.x, event.button.y};
+            case SDL_MOUSEBUTTONDOWN: {
+                const SDL_bool pressed = (e.button.state == SDL_PRESSED) ? SDL_TRUE : SDL_FALSE;
+                const SDL_Point pt = { e.button.x, e.button.y };
+                for (unsigned long i = 0; i < SDL_arraysize(skin->buttons); i++) {
+                    WinAmpSkinButton *btn = &skin->buttons[i];
+                    btn->pressed = (pressed && SDL_PointInRect(&pt, &btn->dstrect)) ? SDL_TRUE : SDL_FALSE;
+                    if (btn->pressed) {
+                        switch ((WinAmpSkinButtonId) i) {
+                            case WASBTN_PREV:
+                                SDL_AudioStreamClear(stream);
+                                if (SDL_AudioStreamPut(stream, wavbuf, wavlen) == -1) {
+                                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Audio stream put failed", SDL_GetError(), window);
+                                    stop_audio();
+                                } else if (SDL_AudioStreamFlush(stream) == -1) {
+                                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Audio stream flush failed", SDL_GetError(), window);
+                                    stop_audio();
+                                }
+                                break;
 
-                for (u8 button_id = 0; button_id < BTN_TOTAL; button_id++)
-                {
-                    Cbutton *button = global_skin.buttons + button_id;
-                    if (SDL_PointInRect(&pt, &button->dest_rect))
-                    {
-                        button->pressed = event.button.state;
+                            case WASBTN_PAUSE:
+                                paused = paused ? SDL_FALSE : SDL_TRUE;
+                                SDL_PauseAudioDevice(audio_device, paused);
+                                break;
+
+                            case WASBTN_STOP:
+                                stop_audio();
+                                break;
+
+                            default:
+                                break;
+                        }
                     }
                 }
-
-                if (global_skin.buttons[BTN_PREV].pressed)
-                {
-
-                    SDL_AudioStreamClear(global_audio_stream);
-                    if (SDL_AudioStreamPut(global_audio_stream, global_wav_buffer, global_wav_len) == -1)
-                    {
-                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-                        audio_cleanup();
-                    }
-                    else if (SDL_AudioStreamFlush(global_audio_stream) == -1)
-                    {
-                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-                        audio_cleanup();
-                    }
-                }
-                else if (global_skin.buttons[BTN_PAUSE].pressed && global_audio_device)
-                {
-                    audio_paused = 1;
-                    SDL_PauseAudioDevice(global_audio_device, audio_paused);
-                }
-                else if (global_skin.buttons[BTN_PLAY].pressed && global_audio_device)
-                {
-                    audio_paused = 0;
-                    SDL_PauseAudioDevice(global_audio_device, audio_paused);
-                }
-                else if (global_skin.buttons[BTN_STOP].pressed && global_audio_device)
-                {
-                    audio_paused = 1;
-                    SDL_PauseAudioDevice(global_audio_device, audio_paused);
-                    SDL_ClearQueuedAudio(global_audio_device);
-                    audio_cleanup();
-                }
-
-#if 0
-                if (SDL_PointInRect(&pt, &rect_volume) && (event.button.button == SDL_BUTTON_LEFT))
-                {
-                    f32 x_offset = (f32)(pt.x - rect_volume.x);
-                    global_audio_volume = (x_offset / (f32)(rect_volume.w));
-                    if (global_audio_volume > 0.996)
-                        global_audio_volume = 1.0f;
-                    rect_volume_knob.x = pt.x - (rect_volume_knob.w / 2);
-                }
-                else if (SDL_PointInRect(&pt, &rect_balance) && (event.button.button == SDL_BUTTON_LEFT))
-                {
-                    f32 x_offset = (f32)(pt.x - rect_balance.x);
-                    global_audio_balance = (x_offset / (f32)(rect_balance.w));
-                    if (global_audio_balance >= 0.980)
-                        global_audio_balance = 1.0f;
-                    else if (global_audio_balance < 0.02)
-                        global_audio_balance = 0.0f;
-                    rect_balance_knob.x = pt.x - (rect_balance_knob.w / 2);
-                }
-#endif
                 break;
             }
 
-            case SDL_MOUSEMOTION:
-            {
-#if 0
-                SDL_Point pt = {event.motion.x, event.motion.y};
-                if (SDL_PointInRect(&pt, &rect_volume) && (event.motion.state & SDL_BUTTON_LMASK))
-                {
-                    f32 x_offset = (f32)(pt.x - rect_volume.x);
-                    global_audio_volume = (x_offset / (f32)(rect_volume.w));
-                    if (global_audio_volume > 0.996)
-                        global_audio_volume = 1.0f;
-                    rect_volume_knob.x = pt.x - (rect_volume_knob.w / 2);
+            #if 0
+            case SDL_MOUSEMOTION: {
+                const SDL_Point pt = { e.motion.x, e.motion.y };
+                if (SDL_PointInRect(&pt, &volume_rect) && (e.motion.state & SDL_BUTTON_LMASK)) {  // mouse is pressed inside the "volume" "slider"?
+                    const float fx = (float) (pt.x - volume_rect.x);
+                    volume_slider_value = (fx / ((float) volume_rect.w));  // a value between 0.0f and 1.0f
+                    //printf("SLIDING! At %dx%d (%d percent)\n", pt.x, pt.y, (int) SDL_round(volume_slider_value * 100.0f));
+                    volume_knob.x = pt.x - (volume_knob.w / 2);
+                    volume_knob.x = SDL_max(volume_knob.x, volume_rect.x);
+                    volume_knob.x = SDL_min(volume_knob.x, (volume_rect.x + volume_rect.w) - volume_knob.w);
+                } else if (SDL_PointInRect(&pt, &balance_rect) && (e.motion.state & SDL_BUTTON_LMASK)) {  // mouse is pressed inside the "balance" "slider"?
+                    const float fx = (float) (pt.x - balance_rect.x);
+                    balance_slider_value = (fx / ((float) balance_rect.w));  // a value between 0.0f and 1.0f
+                    //printf("SLIDING! At %dx%d (%d percent)\n", pt.x, pt.y, (int) SDL_round(balance_slider_value * 100.0f));
+                    balance_knob.x = pt.x - (balance_knob.w / 2);
+                    balance_knob.x = SDL_max(balance_knob.x, balance_rect.x);
+                    balance_knob.x = SDL_min(balance_knob.x, (balance_rect.x + balance_rect.w) - balance_knob.w);
                 }
-                else if (SDL_PointInRect(&pt, &rect_balance) && (event.button.button == SDL_BUTTON_LEFT))
-                {
-                    f32 x_offset = (f32)(pt.x - rect_balance.x);
-                    global_audio_balance = (x_offset / (f32)(rect_balance.w));
-                    if (global_audio_balance >= 0.980)
-                        global_audio_balance = 1.0f;
-                    else if (global_audio_balance < 0.02)
-                        global_audio_balance = 0.0f;
-                    rect_balance_knob.x = pt.x - (rect_balance_knob.w / 2);
-                }
-#endif
                 break;
             }
+            #endif
 
-            case SDL_DROPFILE:
-            {
-                audio_paused = 1;
-                SDL_PauseAudioDevice(global_audio_device, audio_paused);
-                if (!audio_open_file(event.drop.file))
-                {
-                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "sdlamp", SDL_GetError(), global_window);
-                }
-                SDL_free(event.drop.file);
+            case SDL_DROPFILE: {
+                open_new_audio_file(e.drop.file);
+                SDL_free(e.drop.file);
                 break;
             }
-            }
-
-#if 0
-            rect_volume_knob.x = SDL_max(rect_volume_knob.x, rect_volume.x);
-            rect_volume_knob.x = SDL_min(rect_volume_knob.x, rect_volume.x + rect_volume.w - rect_volume_knob.w);
-            rect_balance_knob.x = SDL_max(rect_balance_knob.x, rect_balance.x);
-            rect_balance_knob.x = SDL_min(rect_balance_knob.x, rect_balance.x + rect_balance.w - rect_balance_knob.w);
-#endif
         }
-
-        SDL_SetRenderDrawColor(global_renderer, 0x00, 0x00, 0x00, 255);
-        SDL_RenderClear(global_renderer);
-        SDL_RenderCopy(global_renderer, global_skin.main, 0, 0);
-        for (u8 button_id = 0; button_id < BTN_TOTAL; button_id++)
-        {
-            Cbutton *button = global_skin.buttons + button_id;
-            SDL_Rect *rect_src_cbutton = button->pressed ? &button->src_rect_pressed : &button->src_rect_unpressed;
-            SDL_RenderCopy(global_renderer, global_skin.cbuttons, rect_src_cbutton, &button->dest_rect);
-        }
-
-        SDL_RenderPresent(global_renderer);
-        SDL_Delay(16);
     }
 
-    cleanup();
+    return SDL_TRUE;  // keep going.
+}
+
+int main(int argc, char **argv)
+{
+    init_everything(argc, argv);  // will panic_and_abort on issues.
+
+    while (handle_events(&skin)) {
+        draw_frame(renderer, &skin);
+    }
+
+    deinit_everything();
+
     return 0;
 }
+
+// end of sdlamp.c ...
+
