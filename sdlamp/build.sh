@@ -22,6 +22,7 @@ CFLAGS='-std=c99
 -Wno-incompatible-pointer-types-discards-qualifiers
 -Wnull-conversion
 -Wno-unused-variable
+-Wno-unused-parameter
 -g'
 
 clang $CFLAGS src/sdlamp.c -o sdlamp `sdl2-config --cflags --libs`
