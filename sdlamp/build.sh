@@ -1,31 +1,8 @@
 #!/bin/sh
 
-CFLAGS='-std=c99 
--Wall
--Wextra
--Werror
--Wpedantic
--pedantic-errors
--Wno-unused-function
--Wimplicit-int-conversion
--Wint-conversion
--Wshorten-64-to-32
--Wimplicit-float-conversion
--Wimplicit-int-float-conversion
--Wfloat-conversion
--Wfloat-overflow-conversion
--Wfloat-zero-conversion
--Wbool-conversion
--Wliteral-conversion
--Wimplicit-conversion-floating-point-to-bool
--Wnon-literal-null-conversion
--Wno-incompatible-pointer-types-discards-qualifiers
--Wnull-conversion
--Wno-unused-variable
--Wno-unused-parameter
--g'
+CFLAGS='-std=c99 -Wall -O0 -ggdb3'
 
-clang $CFLAGS src/sdlamp.c -o sdlamp `sdl2-config --cflags --libs`
+clang -D_POSIX_C_SOURCE=200809L $CFLAGS src/sdlamp.c src/physfs/*.c -o sdlamp `sdl2-config --cflags --libs`
 
 
 # -fsanitize=address
