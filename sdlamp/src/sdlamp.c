@@ -53,6 +53,7 @@ typedef struct
     SDL_Texture *tex_cbuttons;
     SDL_Texture *tex_volume;
     SDL_Texture *tex_balance;
+    SDL_Texture *tex_titlebar;
     WinAmpSkinButton buttons[WASBTN_TOTAL];
     WinAmpSkinSlider sliders[WASSLD_TOTAL];
     WinAmpSkinButton *pressed;
@@ -197,7 +198,10 @@ static SDL_bool open_new_audio_file(const char *fname)
     return SDL_TRUE;
 }
 
-// !!! FIXME: maybe a better name.
+static SDL_HitTestResult hit_test_callback(SDL_Window *win, const SDL_Point *area, void *data)
+{
+    return (area->y < 14) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+}
 
 static void previous_clicked(void)
 {
@@ -303,6 +307,7 @@ static void free_skin(WinAmpSkin *skin)
     if (skin->tex_cbuttons) { SDL_DestroyTexture(skin->tex_cbuttons); };
     if (skin->tex_volume) { SDL_DestroyTexture(skin->tex_volume); };
     if (skin->tex_balance) { SDL_DestroyTexture(skin->tex_balance); };
+    if (skin->tex_titlebar) { SDL_DestroyTexture(skin->tex_titlebar); };
 
     SDL_zerop(skin);
 }
@@ -319,6 +324,7 @@ static void load_skin(WinAmpSkin *skin, const char *fname)
     skin->tex_cbuttons = load_texture(openrw("cbuttons.bmp"));
     skin->tex_volume = load_texture(openrw("volume.bmp"));
     skin->tex_balance = load_texture(openrw("balance.bmp"));
+    skin->tex_titlebar = load_texture(openrw("titlebar.bmp"));
 
     PHYSFS_unmount(fname);
 
@@ -349,10 +355,12 @@ static void init_everything(int argc, char **argv)
         panic_and_abort("Sound_Init failed", Sound_GetError());
     }
 
-    window = SDL_CreateWindow("Hello SDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 275, 116, SDL_WINDOW_HIDDEN);
+    window = SDL_CreateWindow("Hello SDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 275, 116, SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS);
     if (!window) {
         panic_and_abort("SDL_CreateWindow failed", SDL_GetError());
     }
+
+    SDL_SetWindowHitTest(window, hit_test_callback, 0);
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
@@ -421,12 +429,28 @@ static void draw_slider(SDL_Renderer *renderer, WinAmpSkinSlider *slider)
 
 static void draw_frame(SDL_Renderer *renderer, WinAmpSkin *skin)
 {
+    SDL_Rect src_rect, dest_rect;
     int i;
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    SDL_RenderCopy(renderer, skin->tex_main, NULL, NULL);
+    SDL_RenderCopy(renderer, skin->tex_main, NULL, 0);
+
+    src_rect.x = 27;
+    src_rect.y = 15;
+    src_rect.w = 275;
+    src_rect.h = 14;
+    if (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS)
+    {
+        src_rect.y = 0;
+    }
+
+    dest_rect.x = 0;
+    dest_rect.y = 0;
+    dest_rect.w = 275;
+    dest_rect.h = 14;
+    SDL_RenderCopy(renderer, skin->tex_titlebar, &src_rect, &dest_rect);
 
     for (i = 0; i < SDL_arraysize(skin->buttons); i++) {
         draw_button(renderer, &skin->buttons[i]);
