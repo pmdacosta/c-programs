@@ -1,15 +1,15 @@
-#include <stdio.h>
 #include "SDL.h"
 #include "SDL_sound.h"
+#include "physfs/ignorecase.h"
 #include "physfs/physfs.h"
 #include "physfs/physfsrwops.h"
-#include "physfs/ignorecase.h"
+#include <stdio.h>
 
 typedef void (*ClickFn)(void);
 
 typedef struct
 {
-    SDL_Texture *texture;  // YOU DO NOT OWN THIS POINTER, DON'T FREE IT.
+    SDL_Texture *texture; // YOU DO NOT OWN THIS POINTER, DON'T FREE IT.
     SDL_Rect srcrect_unpressed;
     SDL_Rect srcrect_pressed;
     SDL_Rect dstrect;
@@ -18,7 +18,10 @@ typedef struct
 
 typedef enum
 {
-    WASBTN_PREV=0,
+    WASBTN_SYSTEM = 0,
+    WASBTN_MINIMIZE,
+    WASBTN_CLOSE,
+    WASBTN_PREV,
     WASBTN_PLAY,
     WASBTN_PAUSE,
     WASBTN_STOP,
@@ -29,7 +32,7 @@ typedef enum
 
 typedef struct
 {
-    SDL_Texture *texture;  // YOU DO NOT OWN THIS POINTER, DON'T FREE IT.
+    SDL_Texture *texture; // YOU DO NOT OWN THIS POINTER, DON'T FREE IT.
     WinAmpSkinButton knob;
     int num_frames;
     int frame_x_offset;
@@ -40,9 +43,16 @@ typedef struct
     float value;
 } WinAmpSkinSlider;
 
+typedef struct
+{
+    SDL_Rect src_rect_active;
+    SDL_Rect src_rect_inactive;
+    SDL_Rect dest_rect;
+} WinAmpSkinTitlebar;
+
 typedef enum
 {
-    WASSLD_VOLUME=0,
+    WASSLD_VOLUME = 0,
     WASSLD_BALANCE,
     WASSLD_TOTAL
 } WinAmpSkinSliderId;
@@ -57,6 +67,7 @@ typedef struct
     WinAmpSkinButton buttons[WASBTN_TOTAL];
     WinAmpSkinSlider sliders[WASSLD_TOTAL];
     WinAmpSkinButton *pressed;
+    WinAmpSkinTitlebar titlebar;
 } WinAmpSkin;
 
 static WinAmpSkin skin;
@@ -68,12 +79,12 @@ static Uint32 sample_position = 0;
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 
-
 #if defined(__GNUC__) || defined(__clang__)
 static void panic_and_abort(const char *title, const char *text) __attribute__((noreturn));
 #endif
 
-static void panic_and_abort(const char *title, const char *text)
+static void
+panic_and_abort(const char *title, const char *text)
 {
     fprintf(stderr, "PANIC: %s ... %s\n", title, text);
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, text, window);
@@ -81,15 +92,18 @@ static void panic_and_abort(const char *title, const char *text)
     exit(1);
 }
 
-static const char *physfs_errstr(void)
+static const char *
+physfs_errstr(void)
 {
     return PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode());
 }
 
-static SDL_RWops *openrw(const char *_fname)
+static SDL_RWops *
+openrw(const char *_fname)
 {
     char *fname = SDL_strdup(_fname);
-    if (!fname) {
+    if (!fname)
+    {
         SDL_OutOfMemory();
         return NULL;
     }
@@ -100,11 +114,13 @@ static SDL_RWops *openrw(const char *_fname)
     return retval;
 }
 
-static void SDLCALL feed_audio_device_callback(void *userdata, Uint8 *output_stream, int len)
+static void SDLCALL
+feed_audio_device_callback(void *userdata, Uint8 *output_stream, int len)
 {
-    Sound_Sample *sample = (Sound_Sample *) SDL_AtomicGetPtr((void **) &current_sample);
+    Sound_Sample *sample = (Sound_Sample *)SDL_AtomicGetPtr((void **)&current_sample);
 
-    if (sample == NULL) {  // nothing playing, just write silence and bail.
+    if (sample == NULL)
+    { // nothing playing, just write silence and bail.
         SDL_memset(output_stream, '\0', len);
         return;
     }
@@ -112,16 +128,19 @@ static void SDLCALL feed_audio_device_callback(void *userdata, Uint8 *output_str
     const float volume = skin.sliders[WASSLD_VOLUME].value;
     const float balance = skin.sliders[WASSLD_BALANCE].value;
 
-    while (len > 0) {
-        if (sample_available == 0) {
+    while (len > 0)
+    {
+        if (sample_available == 0)
+        {
             const Uint32 br = Sound_Decode(sample);
-            if (br == 0) {
+            if (br == 0)
+            {
                 // !!! FIXME: rework stop_audio and use it here.
                 Sound_FreeSample(current_sample);
-                SDL_AtomicSetPtr((void **) &current_sample, NULL);
+                SDL_AtomicSetPtr((void **)&current_sample, NULL);
                 sample_available = 0;
                 sample_position = 0;
-                SDL_memset(output_stream, '\0', len);  // write silence and bail.
+                SDL_memset(output_stream, '\0', len); // write silence and bail.
                 return;
             }
 
@@ -129,30 +148,37 @@ static void SDLCALL feed_audio_device_callback(void *userdata, Uint8 *output_str
             sample_position = 0;
         }
 
-        float *samples = (float *) output_stream;
-        const Uint32 cpy = SDL_min(sample_available, (Uint32) len);
+        float *samples = (float *)output_stream;
+        const Uint32 cpy = SDL_min(sample_available, (Uint32)len);
         SDL_assert(cpy > 0);
-        SDL_memcpy(samples, ((const Uint8 *) sample->buffer) + sample_position, (size_t) cpy);
+        SDL_memcpy(samples, ((const Uint8 *)sample->buffer) + sample_position, (size_t)cpy);
 
-        const int num_samples = (int) (cpy / sizeof (float));
-        SDL_assert((num_samples % 2) == 0);  // this should always be stereo data (at least for now).
+        const int num_samples = (int)(cpy / sizeof(float));
+        SDL_assert((num_samples % 2) == 0); // this should always be stereo data (at least for now).
 
         // change the volume of the audio we're playing.
-        if (volume != 1.0f) {
-            for (int i = 0; i < num_samples; i++) {
+        if (volume != 1.0f)
+        {
+            for (int i = 0; i < num_samples; i++)
+            {
                 samples[i] *= volume;
             }
         }
 
         // first sample is left, second is right.
         // change the balance of the audio we're playing.
-        if (balance > 0.5f) {
-            for (int i = 0; i < num_samples; i += 2) {
+        if (balance > 0.5f)
+        {
+            for (int i = 0; i < num_samples; i += 2)
+            {
                 samples[i] *= 1.0f - balance;
             }
-        } else if (balance < 0.5f) {
-            for (int i = 0; i < num_samples; i += 2) {
-                samples[i+1] *= balance;
+        }
+        else if (balance < 0.5f)
+        {
+            for (int i = 0; i < num_samples; i += 2)
+            {
+                samples[i + 1] *= balance;
             }
         }
 
@@ -163,13 +189,15 @@ static void SDLCALL feed_audio_device_callback(void *userdata, Uint8 *output_str
     }
 }
 
-static void stop_audio(void)
+static void
+stop_audio(void)
 {
     Sound_Sample *sample = current_sample;
     // make sure the audio callback can't touch `sample` while we're freeing it.
-    if (sample) {
+    if (sample)
+    {
         SDL_LockAudioDevice(audio_device);
-        SDL_AtomicSetPtr((void **) &current_sample, NULL);
+        SDL_AtomicSetPtr((void **)&current_sample, NULL);
         SDL_UnlockAudioDevice(audio_device);
         Sound_FreeSample(sample);
     }
@@ -178,81 +206,111 @@ static void stop_audio(void)
     sample_position = 0;
 }
 
-static SDL_bool open_new_audio_file(const char *fname)
+static SDL_bool
+open_new_audio_file(const char *fname)
 {
     stop_audio();
 
-    SDL_assert(current_sample == NULL);  // stop_audio should have set this to NULL.
+    SDL_assert(current_sample == NULL); // stop_audio should have set this to NULL.
 
     Sound_Sample *sample = Sound_NewSampleFromFile(fname, &audio_device_spec, 64 * 1024);
-    if (!sample) {
+    if (!sample)
+    {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Couldn't load audio file!", Sound_GetError(), window);
         return SDL_FALSE;
     }
 
     // make new `sample` available to the audio callback thread.
     SDL_LockAudioDevice(audio_device);
-    SDL_AtomicSetPtr((void **) &current_sample, sample);
+    SDL_AtomicSetPtr((void **)&current_sample, sample);
     SDL_UnlockAudioDevice(audio_device);
 
     return SDL_TRUE;
 }
 
-static SDL_HitTestResult hit_test_callback(SDL_Window *win, const SDL_Point *area, void *data)
+static SDL_HitTestResult
+hit_test_callback(SDL_Window *win, const SDL_Point *area, void *data)
 {
-    return (area->y < 14) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+    if (area->y < 14 && area->x >= 15 && area->x < 244)
+    {
+        return SDL_HITTEST_DRAGGABLE;
+    }
+    return SDL_HITTEST_NORMAL;
 }
 
-static void previous_clicked(void)
+static void
+minimized_clicked(void)
+{
+    
+}
+
+static void
+close_clicked(void)
+{
+    SDL_Event event;
+    SDL_zero(event);
+    event.type = SDL_QUIT;
+    SDL_PushEvent(&event);
+}
+
+static void
+previous_clicked(void)
 {
     int rc = 1;
     SDL_LockAudioDevice(audio_device);
-    if (current_sample) {
+    if (current_sample)
+    {
         rc = Sound_Rewind(current_sample);
     }
     sample_available = 0;
     sample_position = 0;
     SDL_UnlockAudioDevice(audio_device);
-    if (!rc) {
+    if (!rc)
+    {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Couldn't rewind audio file!", Sound_GetError(), window);
     }
 }
 
-static SDL_bool paused = SDL_TRUE;  // !!! FIXME: move this later.
+static SDL_bool paused = SDL_TRUE; // !!! FIXME: move this later.
 
-static void pause_clicked(void)
+static void
+pause_clicked(void)
 {
     paused = paused ? SDL_FALSE : SDL_TRUE;
     SDL_PauseAudioDevice(audio_device, paused);
 }
 
-static void stop_clicked(void)
+static void
+stop_clicked(void)
 {
     stop_audio();
 }
 
-static SDL_Texture *load_texture(SDL_RWops *rw)
+static SDL_Texture *
+load_texture(SDL_RWops *rw)
 {
-    if (rw == NULL) {
+    if (rw == NULL)
+    {
         return NULL;
     }
 
     SDL_Surface *surface = SDL_LoadBMP_RW(rw, 1);
-    if (!surface) {
+    if (!surface)
+    {
         return NULL;
     }
 
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);
-    return texture;  // MAY BE NULL.
+    return texture; // MAY BE NULL.
 }
 
-
-static SDL_INLINE void init_skin_button(WinAmpSkinButton *btn, SDL_Texture *tex, ClickFn clickfn,
-                                        const int w, const int h,
-                                        const int dx, const int dy,
-                                        const int sxu, const int syu,
-                                        const int sxp, const int syp)
+static SDL_INLINE void
+init_skin_button(WinAmpSkinButton *btn, SDL_Texture *tex, ClickFn clickfn,
+                 const int w, const int h,
+                 const int dx, const int dy,
+                 const int sxu, const int syu,
+                 const int sxp, const int syp)
 {
     btn->texture = tex;
     btn->srcrect_unpressed.x = sxu;
@@ -270,17 +328,18 @@ static SDL_INLINE void init_skin_button(WinAmpSkinButton *btn, SDL_Texture *tex,
     btn->clickfn = clickfn;
 }
 
-static SDL_INLINE void init_skin_slider(WinAmpSkinSlider *slider, SDL_Texture *tex,
-                                        const int w, const int h,
-                                        const int dx, const int dy,
-                                        const int knobw, const int knobh,
-                                        const int sxu, const int syu,
-                                        const int sxp, const int syp,
-                                        const int num_frames,
-                                        const int frame_x_offset,
-                                        const int frame_y_offset,
-                                        const int frame_width, const int frame_height,
-                                        const float initial_value)
+static SDL_INLINE void
+init_skin_slider(WinAmpSkinSlider *slider, SDL_Texture *tex,
+                 const int w, const int h,
+                 const int dx, const int dy,
+                 const int knobw, const int knobh,
+                 const int sxu, const int syu,
+                 const int sxp, const int syp,
+                 const int num_frames,
+                 const int frame_x_offset,
+                 const int frame_y_offset,
+                 const int frame_width, const int frame_height,
+                 const float initial_value)
 {
     init_skin_button(&slider->knob, tex, NULL, knobw, knobh, dx, dy, sxu, syu, sxp, syp);
     slider->texture = tex;
@@ -297,26 +356,44 @@ static SDL_INLINE void init_skin_slider(WinAmpSkinSlider *slider, SDL_Texture *t
 
     SDL_assert(initial_value >= 0.0f);
     SDL_assert(initial_value <= 1.0f);
-    const int knobx = dx + (int) ( ( ((((float) w) * initial_value) - (((float) knobw) / 2.0f)) + 0.5f ) );
+    const int knobx = dx + (int)((((((float)w) * initial_value) - (((float)knobw) / 2.0f)) + 0.5f));
     slider->knob.dstrect.x = SDL_clamp(knobx, dx, ((dx + w) - knobw));
 }
 
-static void free_skin(WinAmpSkin *skin)
+static void
+free_skin(WinAmpSkin *skin)
 {
-    if (skin->tex_main) { SDL_DestroyTexture(skin->tex_main); }
-    if (skin->tex_cbuttons) { SDL_DestroyTexture(skin->tex_cbuttons); };
-    if (skin->tex_volume) { SDL_DestroyTexture(skin->tex_volume); };
-    if (skin->tex_balance) { SDL_DestroyTexture(skin->tex_balance); };
-    if (skin->tex_titlebar) { SDL_DestroyTexture(skin->tex_titlebar); };
+    if (skin->tex_main)
+    {
+        SDL_DestroyTexture(skin->tex_main);
+    }
+    if (skin->tex_cbuttons)
+    {
+        SDL_DestroyTexture(skin->tex_cbuttons);
+    };
+    if (skin->tex_volume)
+    {
+        SDL_DestroyTexture(skin->tex_volume);
+    };
+    if (skin->tex_balance)
+    {
+        SDL_DestroyTexture(skin->tex_balance);
+    };
+    if (skin->tex_titlebar)
+    {
+        SDL_DestroyTexture(skin->tex_titlebar);
+    };
 
     SDL_zerop(skin);
 }
 
-static void load_skin(WinAmpSkin *skin, const char *fname)
+static void
+load_skin(WinAmpSkin *skin, const char *fname)
 {
     free_skin(skin);
 
-    if (!PHYSFS_mount(fname, NULL, 1)) {
+    if (!PHYSFS_mount(fname, NULL, 1))
+    {
         return;
     }
 
@@ -325,8 +402,26 @@ static void load_skin(WinAmpSkin *skin, const char *fname)
     skin->tex_volume = load_texture(openrw("volume.bmp"));
     skin->tex_balance = load_texture(openrw("balance.bmp"));
     skin->tex_titlebar = load_texture(openrw("titlebar.bmp"));
+    skin->titlebar.src_rect_active.x = 27;
+    skin->titlebar.src_rect_active.y = 0;
+    skin->titlebar.src_rect_active.w = 275;
+    skin->titlebar.src_rect_active.h = 14;
+
+    skin->titlebar.src_rect_inactive.x = 27;
+    skin->titlebar.src_rect_inactive.y = 15;
+    skin->titlebar.src_rect_inactive.w = 275;
+    skin->titlebar.src_rect_inactive.h = 14;
+
+    skin->titlebar.dest_rect.x = 0;
+    skin->titlebar.dest_rect.y = 0;
+    skin->titlebar.dest_rect.w = 275;
+    skin->titlebar.dest_rect.h = 14;
 
     PHYSFS_unmount(fname);
+
+    init_skin_button(&skin->buttons[WASBTN_SYSTEM], skin->tex_titlebar, 0, 9, 9, 6, 3, 0, 0, 0, 9);
+    init_skin_button(&skin->buttons[WASBTN_MINIMIZE], skin->tex_titlebar, minimized_clicked, 9, 9, 244, 3, 9, 0, 9, 9);
+    init_skin_button(&skin->buttons[WASBTN_CLOSE], skin->tex_titlebar, close_clicked, 9, 9, 264, 3, 18, 0, 18, 9);
 
     init_skin_button(&skin->buttons[WASBTN_PREV], skin->tex_cbuttons, previous_clicked, 23, 18, 16, 88, 0, 0, 0, 18);
     init_skin_button(&skin->buttons[WASBTN_PLAY], skin->tex_cbuttons, NULL, 23, 18, 39, 88, 23, 0, 23, 18);
@@ -339,31 +434,37 @@ static void load_skin(WinAmpSkin *skin, const char *fname)
     init_skin_slider(&skin->sliders[WASSLD_BALANCE], skin->tex_balance, 38, 13, 177, 57, 14, 11, 15, 422, 0, 422, 28, 9, 0, 47, 15, 0.5f);
 }
 
-static void init_everything(int argc, char **argv)
+static void
+init_everything(int argc, char **argv)
 {
     SDL_AudioSpec desired;
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1)
+    {
         panic_and_abort("SDL_Init failed", SDL_GetError());
     }
 
-    if (!PHYSFS_init(argv[0])) {
+    if (!PHYSFS_init(argv[0]))
+    {
         panic_and_abort("PHYSFS_init failed", physfs_errstr());
     }
 
-    if (!Sound_Init()) {
+    if (!Sound_Init())
+    {
         panic_and_abort("Sound_Init failed", Sound_GetError());
     }
 
     window = SDL_CreateWindow("Hello SDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 275, 116, SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS);
-    if (!window) {
+    if (!window)
+    {
         panic_and_abort("SDL_CreateWindow failed", SDL_GetError());
     }
 
     SDL_SetWindowHitTest(window, hit_test_callback, 0);
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer) {
+    if (!renderer)
+    {
         panic_and_abort("SDL_CreateRenderer failed", SDL_GetError());
     }
 
@@ -379,7 +480,8 @@ static void init_everything(int argc, char **argv)
     desired.callback = feed_audio_device_callback;
 
     audio_device = SDL_OpenAudioDevice(NULL, 0, &desired, NULL, 0);
-    if (audio_device == 0) {
+    if (audio_device == 0)
+    {
         panic_and_abort("Couldn't audio device!", SDL_GetError());
     }
 
@@ -388,48 +490,60 @@ static void init_everything(int argc, char **argv)
     audio_device_spec.channels = desired.channels;
     audio_device_spec.rate = desired.freq;
 
-    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);  // tell SDL we want this event that is disabled by default.
+    SDL_EventState(SDL_DROPFILE, SDL_ENABLE); // tell SDL we want this event that is disabled by default.
 
     open_new_audio_file("music.wav");
 }
 
-static void draw_button(SDL_Renderer *renderer, WinAmpSkinButton *btn)
+static void
+draw_button(SDL_Renderer *renderer, WinAmpSkinButton *btn)
 {
     const SDL_bool pressed = (skin.pressed == btn);
-    if (btn->texture == NULL) {
-        if (pressed) {
+    if (btn->texture == NULL)
+    {
+        if (pressed)
+        {
             SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-        } else {
+        }
+        else
+        {
             SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
         }
         SDL_RenderFillRect(renderer, &btn->dstrect);
-    } else {
+    }
+    else
+    {
         SDL_RenderCopy(renderer, btn->texture, pressed ? &btn->srcrect_pressed : &btn->srcrect_unpressed, &btn->dstrect);
     }
 }
 
-static void draw_slider(SDL_Renderer *renderer, WinAmpSkinSlider *slider)
+static void
+draw_slider(SDL_Renderer *renderer, WinAmpSkinSlider *slider)
 {
     SDL_assert(slider->value >= 0.0f);
     SDL_assert(slider->value <= 1.0f);
 
-    if (slider->texture == NULL) {
-        const int color = (int) (255.0f * slider->value);
+    if (slider->texture == NULL)
+    {
+        const int color = (int)(255.0f * slider->value);
         SDL_SetRenderDrawColor(renderer, color, color, color, 255);
         SDL_RenderFillRect(renderer, &slider->dstrect);
-    } else {
-        int frameidx = (int) (((float) slider->num_frames) * slider->value);
+    }
+    else
+    {
+        int frameidx = (int)(((float)slider->num_frames) * slider->value);
         frameidx = SDL_clamp(frameidx, 0, slider->num_frames - 1);
         const int srcy = slider->frame_y_offset + (slider->frame_height * frameidx);
-        const SDL_Rect srcrect = { slider->frame_x_offset, srcy, slider->dstrect.w, slider->dstrect.h };
+        const SDL_Rect srcrect = {slider->frame_x_offset, srcy, slider->dstrect.w, slider->dstrect.h};
         SDL_RenderCopy(renderer, slider->texture, &srcrect, &slider->dstrect);
     }
     draw_button(renderer, &slider->knob);
 }
 
-static void draw_frame(SDL_Renderer *renderer, WinAmpSkin *skin)
+static void
+draw_frame(SDL_Renderer *renderer, WinAmpSkin *skin)
 {
-    SDL_Rect src_rect, dest_rect;
+    SDL_Rect src_rect;
     int i;
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -437,36 +551,28 @@ static void draw_frame(SDL_Renderer *renderer, WinAmpSkin *skin)
 
     SDL_RenderCopy(renderer, skin->tex_main, NULL, 0);
 
-    src_rect.x = 27;
-    src_rect.y = 15;
-    src_rect.w = 275;
-    src_rect.h = 14;
-    if (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS)
+    src_rect = (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS) ? skin->titlebar.src_rect_active : skin->titlebar.src_rect_inactive;
+    SDL_RenderCopy(renderer, skin->tex_titlebar, &src_rect, &skin->titlebar.dest_rect);
+
+    for (i = 0; i < SDL_arraysize(skin->buttons); i++)
     {
-        src_rect.y = 0;
-    }
-
-    dest_rect.x = 0;
-    dest_rect.y = 0;
-    dest_rect.w = 275;
-    dest_rect.h = 14;
-    SDL_RenderCopy(renderer, skin->tex_titlebar, &src_rect, &dest_rect);
-
-    for (i = 0; i < SDL_arraysize(skin->buttons); i++) {
         draw_button(renderer, &skin->buttons[i]);
     }
 
-    for (i = 0; i < SDL_arraysize(skin->sliders); i++) {
+    for (i = 0; i < SDL_arraysize(skin->sliders); i++)
+    {
         draw_slider(renderer, &skin->sliders[i]);
     }
 
     SDL_RenderPresent(renderer);
 }
 
-static void deinit_everything(void)
+static void
+deinit_everything(void)
 {
     SDL_CloseAudioDevice(audio_device);
-    if (current_sample) {
+    if (current_sample)
+    {
         Sound_FreeSample(current_sample);
         current_sample = NULL;
     }
@@ -479,10 +585,12 @@ static void deinit_everything(void)
     SDL_Quit();
 }
 
-static void handle_slider_motion(WinAmpSkinSlider *slider, const SDL_Point *pt)
+static void
+handle_slider_motion(WinAmpSkinSlider *slider, const SDL_Point *pt)
 {
-    if (skin.pressed == &slider->knob) {
-        const float new_value = ((float) (pt->x - slider->dstrect.x)) / ((float) slider->dstrect.w);  // between 0.0f and 1.0f
+    if (skin.pressed == &slider->knob)
+    {
+        const float new_value = ((float)(pt->x - slider->dstrect.x)) / ((float)slider->dstrect.w); // between 0.0f and 1.0f
         const int new_knob_x = pt->x - (slider->knob.dstrect.w / 2);
         const int xnear = slider->dstrect.x;
         const int xfar = (slider->dstrect.x + slider->dstrect.w) - slider->knob.dstrect.w;
@@ -495,95 +603,120 @@ static void handle_slider_motion(WinAmpSkinSlider *slider, const SDL_Point *pt)
     }
 }
 
-static SDL_bool handle_events(WinAmpSkin *skin)
+static SDL_bool
+handle_events(WinAmpSkin *skin)
 {
     SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        switch (e.type) {
-            case SDL_QUIT:
-                return SDL_FALSE;  // don't keep going.
+    while (SDL_PollEvent(&e))
+    {
+        switch (e.type)
+        {
+        case SDL_QUIT:
+            return SDL_FALSE; // don't keep going.
 
-            case SDL_MOUSEBUTTONDOWN: {
-                const SDL_Point pt = { e.button.x, e.button.y };
+        case SDL_MOUSEBUTTONDOWN:
+        {
+            const SDL_Point pt = {e.button.x, e.button.y};
 
-                if (e.button.button != SDL_BUTTON_LEFT) {
-                    break;
-                }
+            if (e.button.button != SDL_BUTTON_LEFT)
+            {
+                break;
+            }
 
-                if (!skin->pressed) {
-                    for (int i = 0; i < SDL_arraysize(skin->buttons); i++) {
-                        WinAmpSkinButton *btn = &skin->buttons[i];
-                        if (SDL_PointInRect(&pt, &btn->dstrect)) {
-                            skin->pressed = btn;
-                            break;
-                        }
+            if (!skin->pressed)
+            {
+                for (int i = 0; i < SDL_arraysize(skin->buttons); i++)
+                {
+                    WinAmpSkinButton *btn = &skin->buttons[i];
+                    if (SDL_PointInRect(&pt, &btn->dstrect))
+                    {
+                        skin->pressed = btn;
+                        break;
                     }
                 }
+            }
 
-                if (!skin->pressed) {
-                    for (int i = 0; i < SDL_arraysize(skin->sliders); i++) {
-                        WinAmpSkinSlider *slider = &skin->sliders[i];
-                        if (SDL_PointInRect(&pt, &slider->dstrect)) {
-                            skin->pressed = &slider->knob;
-                            break;
-                        }
+            if (!skin->pressed)
+            {
+                for (int i = 0; i < SDL_arraysize(skin->sliders); i++)
+                {
+                    WinAmpSkinSlider *slider = &skin->sliders[i];
+                    if (SDL_PointInRect(&pt, &slider->dstrect))
+                    {
+                        skin->pressed = &slider->knob;
+                        break;
                     }
                 }
+            }
 
-                if (skin->pressed) {
-                    SDL_CaptureMouse(SDL_TRUE);
-                }
+            if (skin->pressed)
+            {
+                SDL_CaptureMouse(SDL_TRUE);
+            }
 
+            break;
+        }
+
+        case SDL_MOUSEBUTTONUP:
+        {
+            if (e.button.button != SDL_BUTTON_LEFT)
+            {
                 break;
             }
 
-            case SDL_MOUSEBUTTONUP: {
-                if (e.button.button != SDL_BUTTON_LEFT) {
-                    break;
-                }
-
-                if (skin->pressed) {
-                    SDL_CaptureMouse(SDL_FALSE);
-                    if (skin->pressed->clickfn) {
-                        const SDL_Point pt = { e.button.x, e.button.y };
-                        if (SDL_PointInRect(&pt, &skin->pressed->dstrect)) {
-                            skin->pressed->clickfn();
-                        }
+            if (skin->pressed)
+            {
+                SDL_CaptureMouse(SDL_FALSE);
+                if (skin->pressed->clickfn)
+                {
+                    const SDL_Point pt = {e.button.x, e.button.y};
+                    if (SDL_PointInRect(&pt, &skin->pressed->dstrect))
+                    {
+                        skin->pressed->clickfn();
                     }
-                    skin->pressed = NULL;
                 }
-                break;
+                skin->pressed = NULL;
             }
+            break;
+        }
 
-            case SDL_MOUSEMOTION: {
-                const SDL_Point pt = { e.motion.x, e.motion.y };
-                for (int i = 0; i < SDL_arraysize(skin->sliders); i++) {
-                    handle_slider_motion(&skin->sliders[i], &pt);
-                }
-                break;
+        case SDL_MOUSEMOTION:
+        {
+            const SDL_Point pt = {e.motion.x, e.motion.y};
+            for (int i = 0; i < SDL_arraysize(skin->sliders); i++)
+            {
+                handle_slider_motion(&skin->sliders[i], &pt);
             }
+            break;
+        }
 
-            case SDL_DROPFILE: {
-                const char *ptr = SDL_strrchr(e.drop.file, '.');
-                if (ptr && ((SDL_strcasecmp(ptr, ".wsz") == 0) || (SDL_strcasecmp(ptr, ".zip") == 0))) {
-                    load_skin(skin, e.drop.file);
-                } else {
-                    open_new_audio_file(e.drop.file);
-                }
-                SDL_free(e.drop.file);
-                break;
+        case SDL_DROPFILE:
+        {
+            const char *ptr = SDL_strrchr(e.drop.file, '.');
+            if (ptr && ((SDL_strcasecmp(ptr, ".wsz") == 0) || (SDL_strcasecmp(ptr, ".zip") == 0)))
+            {
+                load_skin(skin, e.drop.file);
             }
+            else
+            {
+                open_new_audio_file(e.drop.file);
+            }
+            SDL_free(e.drop.file);
+            break;
+        }
         }
     }
 
-    return SDL_TRUE;  // keep going.
+    return SDL_TRUE; // keep going.
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
-    init_everything(argc, argv);  // will panic_and_abort on issues.
+    init_everything(argc, argv); // will panic_and_abort on issues.
 
-    while (handle_events(&skin)) {
+    while (handle_events(&skin))
+    {
         draw_frame(renderer, &skin);
     }
 
@@ -593,4 +726,3 @@ int main(int argc, char **argv)
 }
 
 // end of sdlamp.c ...
-
