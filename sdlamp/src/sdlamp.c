@@ -65,9 +65,12 @@ typedef struct
     SDL_Texture *tex_balance;
     SDL_Texture *tex_titlebar;
     WinAmpSkinButton buttons[WASBTN_TOTAL];
+    WinAmpSkinButton winshade_buttons[WASBTN_TOTAL];
     WinAmpSkinSlider sliders[WASSLD_TOTAL];
+    WinAmpSkinSlider winshade_position_slider;
     WinAmpSkinButton *pressed;
     WinAmpSkinTitlebar titlebar;
+    SDL_bool winshade_mode;
 } WinAmpSkin;
 
 static WinAmpSkin skin;
@@ -419,6 +422,7 @@ load_skin(WinAmpSkin *skin, const char *fname)
 
     PHYSFS_unmount(fname);
 
+    // normal window mode
     init_skin_button(&skin->buttons[WASBTN_SYSTEM], skin->tex_titlebar, 0, 9, 9, 6, 3, 0, 0, 0, 9);
     init_skin_button(&skin->buttons[WASBTN_MINIMIZE], skin->tex_titlebar, minimize_clicked, 9, 9, 244, 3, 9, 0, 9, 9);
     init_skin_button(&skin->buttons[WASBTN_CLOSE], skin->tex_titlebar, close_clicked, 9, 9, 264, 3, 18, 0, 18, 9);
@@ -432,6 +436,20 @@ load_skin(WinAmpSkin *skin, const char *fname)
 
     init_skin_slider(&skin->sliders[WASSLD_VOLUME], skin->tex_volume, 68, 13, 107, 57, 14, 11, 15, 422, 0, 422, 28, 0, 0, 68, 15, 1.0f);
     init_skin_slider(&skin->sliders[WASSLD_BALANCE], skin->tex_balance, 38, 13, 177, 57, 14, 11, 15, 422, 0, 422, 28, 9, 0, 47, 15, 0.5f);
+
+    // winshade mode
+    init_skin_button(&skin->winshade_buttons[WASBTN_SYSTEM], skin->tex_titlebar, 0, 9, 9, 6, 3, 0, 0, 0, 9);
+    init_skin_button(&skin->winshade_buttons[WASBTN_MINIMIZE], skin->tex_titlebar, minimize_clicked, 9, 9, 244, 3, 9, 0, 9, 9);
+    init_skin_button(&skin->winshade_buttons[WASBTN_CLOSE], skin->tex_titlebar, close_clicked, 9, 9, 264, 3, 18, 0, 18, 9);
+6, 88, 0, 0, 0, 18);
+    init_skin_button(&skin->winshade_buttons[WASBTN_PLAY], skin->tex_titlebar, NULL, 23, 18, 39, 88, 23, 0, 23, 18);
+    init_skin_button(&skin->winshade_buttons[WASBTN_PAUSE], skin->tex_titlebar, pause_clicked, 23, 18, 62, 88, 46, 0, 46, 18);
+    init_skin_button(&skin->winshade_buttons[WASBTN_STOP], skin->tex_titlebar, stop_clicked, 23, 18, 85, 88, 69, 0, 69, 18);
+    init_skin_button(&skin->winshade_buttons[WASBTN_NEXT], skin->tex_titlebar, NULL, 22, 18, 108, 88, 92, 0, 92, 18);
+    init_skin_button(&skin->winshade_buttons[WASBTN_EJECT], skin->tex_titlebar, NULL, 22, 16, 136, 89, 114, 0, 114, 16);
+
+    init_skin_slider(&skin->winshade_position_slider, skin->tex_volume, 68, 13, 107, 57, 14, 11, 15, 422, 0, 422, 28, 0, 0, 68, 15, 1.0f);
+    
 }
 
 static void
