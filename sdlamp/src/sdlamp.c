@@ -239,9 +239,9 @@ hit_test_callback(SDL_Window *win, const SDL_Point *area, void *data)
 }
 
 static void
-minimized_clicked(void)
+minimize_clicked(void)
 {
-    
+    SDL_MinimizeWindow(window);
 }
 
 static void
@@ -420,7 +420,7 @@ load_skin(WinAmpSkin *skin, const char *fname)
     PHYSFS_unmount(fname);
 
     init_skin_button(&skin->buttons[WASBTN_SYSTEM], skin->tex_titlebar, 0, 9, 9, 6, 3, 0, 0, 0, 9);
-    init_skin_button(&skin->buttons[WASBTN_MINIMIZE], skin->tex_titlebar, minimized_clicked, 9, 9, 244, 3, 9, 0, 9, 9);
+    init_skin_button(&skin->buttons[WASBTN_MINIMIZE], skin->tex_titlebar, minimize_clicked, 9, 9, 244, 3, 9, 0, 9, 9);
     init_skin_button(&skin->buttons[WASBTN_CLOSE], skin->tex_titlebar, close_clicked, 9, 9, 264, 3, 18, 0, 18, 9);
 
     init_skin_button(&skin->buttons[WASBTN_PREV], skin->tex_cbuttons, previous_clicked, 23, 18, 16, 88, 0, 0, 0, 18);
