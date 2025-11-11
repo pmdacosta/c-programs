@@ -32,3 +32,5 @@
 - [How can I hide "defined but not used" warnings in GCC?](https://stackoverflow.com/questions/386220/how-can-i-hide-defined-but-not-used-warnings-in-gcc)
 - [What Every Programmer Should Know About Memory](https://people.freebsd.org/~lstewart/articles/cpumemory.pdf)
 - [https://down2core.com/](https://down2core.com/)
+- [Let's implement buffered, formatted output](https://nullprogram.com/blog/2023/02/13/)
+- [X macro](https://en.wikipedia.org/wiki/X_macro)
