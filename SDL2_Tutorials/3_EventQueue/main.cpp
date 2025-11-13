@@ -34,18 +34,9 @@ int main(int argc, char* argv[]){
             480,
             SDL_WINDOW_SHOWN);
 
-    // Infinite loop for our application
-    bool gameIsRunning = true;
-    while(gameIsRunning){
-        SDL_Event event;
-        // Start our event loop
-        while(SDL_PollEvent(&event)){
-            // Handle each specific event
-            if(event.type == SDL_QUIT){
-                gameIsRunning= false;
-            }
-        }
-    }
+    // We add a delay in order to see that our window
+    // has successfully popped up.
+    SDL_Delay(3000);
 
     // We destroy our window. We are passing in the pointer
     // that points to the memory allocated by the 
@@ -55,21 +46,6 @@ int main(int argc, char* argv[]){
     
     // We safely uninitialize SDL2, that is, we are
     // taking down the subsystems here before we exit
-    // We add a delay in order to see that our window
-    // has successfully popped up.
-    SDL_Delay(3000);
-    // We add a delay in order to see that our window
-    // has successfully popped up.
-    SDL_Delay(3000);
-    // We add a delay in order to see that our window
-    // has successfully popped up.
-    SDL_Delay(3000);
-    // We add a delay in order to see that our window
-    // has successfully popped up.
-    SDL_Delay(3000);
-    // We add a delay in order to see that our window
-    // has successfully popped up.
-    SDL_Delay(3000);
     // our program.
     SDL_Quit();
     return 0;
